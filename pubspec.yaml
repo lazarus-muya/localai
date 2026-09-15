@@ -1,5 +1,5 @@
 name: localai
-description: "A new Flutter project."
+description: "Local-first offline AI chat platform."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -9,12 +9,60 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # State management
   flutter_riverpod: ^3.4.3
 
+  # Routing
+  go_router: ^15.1.0
+
+  # Local storage
+  drift: ^2.24.0
+  drift_flutter: ^0.2.4
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # Secrets
+  flutter_secure_storage: ^9.2.2
+
+  # Fast-boot prefs (theme mode)
+  shared_preferences: ^2.3.3
+
+  # HTTP
+  dio: ^5.7.0
+
+  # Rich content rendering
+  markdown: ^7.2.2
+  flutter_markdown_plus: ^1.0.6
+  flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
+  flutter_html: ^3.0.0
+  cached_network_image: ^3.4.1
+
+  # Hardware/device info
+  device_info_plus: ^11.2.0
+
+  # File/dir access
+  file_picker: ^8.1.4
+
+  # Concurrency helpers
+  async: ^2.11.0
+
+  # Value types / DTOs
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+  uuid: ^4.5.1
+
 dev_dependencies:
-  flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  drift_dev: ^2.24.0
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true
