@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../domain/entities/message.dart';
+import 'rich_content_view.dart';
 import 'streaming_indicator.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -31,9 +32,9 @@ class MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isEmptyStreaming)
-                  const StreamingIndicator()
+                  StreamingIndicator(since: message.createdAt)
                 else
-                  SelectableText(message.content, style: TextStyle(color: textColor)),
+                  RichContentView(content: message.content, textColor: textColor),
                 if (message.status == MessageStatus.error && message.errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),

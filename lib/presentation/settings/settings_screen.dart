@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/di/providers.dart';
 import '../../core/theme/theme_mode_controller.dart';
 import '../../domain/entities/app_settings.dart';
+import '../models/model_library_controller.dart';
 
 final watchedSettingsProvider = StreamProvider<AppSettings>((ref) {
   return ref.watch(chatRepositoryProvider).watchSettings();
@@ -103,6 +104,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              _InstalledModelChips(
+                onPicked: (name) => setState(() => _modelController.text = name),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -143,6 +147,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Failed to load settings: $e')),
       ),
+    );
+  }
+}
+
+class _InstalledModelChips extends ConsumerWidget {
+  const _InstalledModelChips({required this.onPicked});
+
+  final ValueChanged<String> onPicked;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final modelsAsync = ref.watch(installedModelsProvider);
+    return modelsAsync.when(
+      data: (models) {
+        if (models.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final m in models)
+                ActionChip(label: Text(m.name), onPressed: () => onPicked(m.name)),
+            ],
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: LinearProgressIndicator(),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }

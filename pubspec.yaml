@@ -37,14 +37,10 @@ dependencies:
   flutter_markdown_plus: ^1.0.6
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
-  flutter_html: ^3.0.0
   cached_network_image: ^3.4.1
 
   # Hardware/device info
   device_info_plus: ^11.2.0
-
-  # File/dir access
-  file_picker: ^8.1.4
 
   # Concurrency helpers
   async: ^2.11.0

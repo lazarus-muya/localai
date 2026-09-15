@@ -181,6 +181,51 @@ class OllamaEngine implements InferenceEngine {
     }
   }
 
+  /// Registers a locally-downloaded GGUF file as an Ollama model via
+  /// `/api/create`, using a minimal `FROM <path>` Modelfile. This requires
+  /// the Ollama server itself to have filesystem access to [ggufPath] —
+  /// true for the common case of a local Ollama install, not yet for a
+  /// remote one (that needs the blob-upload variant of this API, deferred
+  /// until a remote engine is wired up).
+  Future<void> createModelFromGguf({
+    required String baseUrl,
+    required String modelName,
+    required String ggufPath,
+    void Function(String status)? onProgress,
+  }) async {
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '$baseUrl/api/create',
+        data: jsonEncode({
+          'model': modelName,
+          'modelfile': 'FROM $ggufPath',
+          'stream': true,
+        }),
+        options: Options(responseType: ResponseType.stream),
+      );
+      var buffer = '';
+      await for (final chunk in response.data!.stream) {
+        buffer += utf8.decode(chunk, allowMalformed: true);
+        var newlineIndex = buffer.indexOf('\n');
+        while (newlineIndex != -1) {
+          final line = buffer.substring(0, newlineIndex).trim();
+          buffer = buffer.substring(newlineIndex + 1);
+          if (line.isNotEmpty) {
+            final json = jsonDecode(line) as Map<String, dynamic>;
+            if (json['error'] != null) {
+              throw EngineException(json['error'] as String);
+            }
+            final status = json['status'] as String?;
+            if (status != null) onProgress?.call(status);
+          }
+          newlineIndex = buffer.indexOf('\n');
+        }
+      }
+    } on DioException catch (e) {
+      throw NetworkException(_describeDioError(e));
+    }
+  }
+
   @override
   Future<bool> testConnection({required String baseUrl}) async {
     try {

@@ -1,7 +1,8 @@
-import 'dart:async';
-
+import '../../core/utils/cancel_signal.dart';
 import '../entities/inference_settings.dart';
 import '../entities/message.dart' show ChatRole;
+
+export '../../core/utils/cancel_signal.dart';
 
 class ChatTurn {
   const ChatTurn({required this.role, required this.content});
@@ -37,26 +38,6 @@ class PullProgress {
   final String status;
   final int? completedBytes;
   final int? totalBytes;
-}
-
-/// Cooperative cancellation token, owned by the domain layer so engines
-/// (which may be backed by dio, an FFI call, etc.) don't leak their
-/// transport-specific cancellation type into calling code.
-class CancelSignal {
-  bool _cancelled = false;
-  final StreamController<void> _controller = StreamController<void>.broadcast();
-
-  bool get isCancelled => _cancelled;
-
-  Stream<void> get onCancel => _controller.stream;
-
-  void cancel() {
-    if (_cancelled) return;
-    _cancelled = true;
-    _controller.add(null);
-  }
-
-  void dispose() => _controller.close();
 }
 
 /// Pluggable inference backend. [OllamaEngine] is the only implementation in
