@@ -65,7 +65,7 @@ lib/
   - **Windows:** Visual Studio 2022 with the "Desktop development with C++" workload.
   - **Android:** Android Studio with an installed SDK/NDK, or just the command-line
     tools (`flutter doctor` will tell you what's missing).
-  - **Web:** no extra tooling beyond Flutter's web support (`flutter config --enable-web`
+  - **Web:** `Experimental - Not tested` no extra tooling beyond Flutter's web support (`flutter config --enable-web`
     if it isn't already enabled).
 
 Verify your setup:
@@ -76,15 +76,27 @@ flutter doctor
 
 ## Getting started
 
-1. Clone the repository and fetch dependencies:
+1. Install Ollama:
+
+    - Windows `PowerShell`: 
+
+        ```sh 
+        irm https://ollama.com/install.ps1 | iex
+        ```
+    - Linux & macOS: 
+        ```sh 
+        curl -fsSL https://ollama.com/install.sh | sh
+        ```
+
+2. Clone the repository and fetch dependencies:
 
    ```sh
-   git clone <repo-url> localai
+   git clone https://github.com/lazarus-muya/localai.git
    cd localai
    flutter pub get
    ```
 
-2. Generate the Drift/Freezed/JSON-serializable code (required after a fresh clone, and
+3. Generate the Drift/Freezed/JSON-serializable code (required after a fresh clone, and
    any time you change a `@freezed`, `@JsonSerializable`, or Drift table definition):
 
    ```sh
@@ -97,13 +109,13 @@ flutter doctor
    dart run build_runner watch --delete-conflicting-outputs
    ```
 
-3. Make sure Ollama is running and reachable:
+4. Make sure Ollama is running and reachable:
 
    ```sh
    ollama serve
    ```
 
-4. Run the app on a connected device or emulator:
+5. Run the app on a connected device or emulator:
 
    ```sh
    flutter run
@@ -113,11 +125,10 @@ flutter doctor
 
    ```sh
    flutter run -d windows
-   flutter run -d chrome
    flutter run -d <android-device-id>   # see `flutter devices`
    ```
 
-5. On first launch, open **Settings** and confirm the Ollama server URL/port point at
+6. On first launch, open **Settings** and confirm the Ollama server URL/port point at
    your running instance, then use **Test connection** to verify connectivity. Pull a
    model from the **Models** tab (or via `ollama pull <model>` directly) before starting
    a chat.
@@ -136,13 +147,15 @@ and the `data\` asset bundle: copy the whole folder to distribute).
 ### Android
 
 ```sh
+# single binary - large apk size as it compiles for all arch
 flutter build apk --release
+# split binaries per arch - Recommended for smaller apk
+flutter build apk --split-per-abi
 # or, for Play Store distribution:
 flutter build appbundle --release
 ```
 
-Output: `build\app\outputs\flutter-apk\app-release.apk` (or
-`build\app\outputs\bundle\release\app-release.aab`).
+Output: `build\app\outputs\flutter-apk\`
 
 > The debug build signs with the debug keystore. For a release you intend to distribute,
 > configure your own signing config in `android/app/build.gradle.kts` before building
@@ -162,9 +175,7 @@ cross-device access.
 
 ## Running tests
 
-```sh
-flutter test
-```
+`Not implemented `
 
 ## Project configuration notes
 
