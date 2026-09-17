@@ -31,7 +31,7 @@ targets **Web**.
 ## Screenshots
 
 <p align="center">
-  <img src="chat-page.png" alt="Chat page" width="70%" />
+  <img src="chat-page.png" alt="Chat page" width="90%" />
 </p>
 <p align="center">
   <img src="models-page.png" alt="Models page" width="49%" />
