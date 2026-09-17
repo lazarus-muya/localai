@@ -92,8 +92,10 @@ class HistoryScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final c = conversations[index];
               return ListTile(
-                title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(_formatDate(c.updatedAt)),
+                title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
+                subtitle: Text(_formatDate(c.updatedAt), style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                  color: Theme.of(context).textTheme.bodySmall!.color!.withValues(alpha: 0.5),
+                )),
                 onTap: () => context.go('/chat/${c.id}'),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {

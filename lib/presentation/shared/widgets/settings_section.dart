@@ -61,12 +61,14 @@ class SettingsRow extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.trailingWidth,
+    this.isForSuccess = false,
   });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
   final double? trailingWidth;
+  final bool isForSuccess;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +95,7 @@ class SettingsRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle!,
-                    style: TextStyle(color: palette.mutedText, fontSize: 12.5),
+                    style: TextStyle(color: isForSuccess ? palette.success : palette.mutedText, fontSize: 12.5),
                   ),
                 ],
               ],
