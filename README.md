@@ -31,9 +31,11 @@ targets **Web**.
 ## Screenshots
 
 <p align="center">
-  <img src="chat-page.png" alt="Chat page" width="32%" />
-  <img src="models-page.png" alt="Models page" width="32%" />
-  <img src="settings-page.png" alt="Settings page" width="32%" />
+  <img src="chat-page.png" alt="Chat page" width="70%" />
+</p>
+<p align="center">
+  <img src="models-page.png" alt="Models page" width="49%" />
+  <img src="settings-page.png" alt="Settings page" width="49%" />
 </p>
 
 ## Architecture
