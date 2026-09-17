@@ -28,6 +28,14 @@ targets **Web**.
   model keep-alive duration (how long Ollama keeps a model resident in memory).
 - **Light/dark theming** that follows the system or can be pinned manually.
 
+## Screenshots
+
+<p align="center">
+  <img src="chat-page.png" alt="Chat page" width="32%" />
+  <img src="models-page.png" alt="Models page" width="32%" />
+  <img src="settings-page.png" alt="Settings page" width="32%" />
+</p>
+
 ## Architecture
 
 The codebase follows a layered structure:
