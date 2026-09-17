@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/hardware_profile.dart';
 import '../../shared/format_bytes.dart';
+import '../../shared/widgets/settings_section.dart';
 import '../model_library_controller.dart';
 import 'add_remote_model_dialog.dart';
 import 'fit_badge.dart';
@@ -10,16 +12,37 @@ import 'fit_badge.dart';
 class InstalledModelsTab extends ConsumerWidget {
   const InstalledModelsTab({super.key});
 
+  Future<bool> _confirm(BuildContext context, {required String title, required String content}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modelsAsync = ref.watch(installedModelsProvider);
     final hardwareAsync = ref.watch(hardwareProfileProvider);
     final downloads = ref.watch(downloadManagerProvider);
 
+    final palette = context.palette;
+
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(installedModelsProvider),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         children: [
           hardwareAsync.when(
             data: (hw) => _HardwareBanner(hardware: hw),
@@ -27,13 +50,16 @@ class InstalledModelsTab extends ConsumerWidget {
             error: (e, _) => Text('Hardware detection failed: $e'),
           ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => const AddRemoteModelDialog(),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => const AddRemoteModelDialog(),
+              ),
+              icon: const Icon(Icons.add_link),
+              label: const Text('Add model from URL'),
             ),
-            icon: const Icon(Icons.add_link),
-            label: const Text('Add model from URL'),
           ),
           if (downloads.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -43,34 +69,87 @@ class InstalledModelsTab extends ConsumerWidget {
                 child: _DownloadCard(downloadKey: entry.key, state: entry.value),
               ),
           ],
-          const Divider(height: 32),
-          Text('Installed models', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Installed models',
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              modelsAsync.maybeWhen(
+                data: (models) => models.isEmpty
+                    ? const SizedBox.shrink()
+                    : TextButton.icon(
+                        onPressed: () async {
+                          final confirmed = await _confirm(
+                            context,
+                            title: 'Delete all models?',
+                            content:
+                                'This removes all ${models.length} installed model(s). This cannot be undone.',
+                          );
+                          if (!confirmed) return;
+                          await ref.read(modelActionsProvider).deleteAllModels();
+                        },
+                        icon: Icon(Icons.delete_sweep, color: palette.danger, size: 18),
+                        label: Text('Delete all', style: TextStyle(color: palette.danger)),
+                      ),
+                orElse: () => const SizedBox.shrink(),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           modelsAsync.when(
             data: (models) {
               if (models.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text('No models installed yet. Pull one via the HuggingFace tab.'),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'No models installed yet. Get one from the HuggingFace tab.',
+                    style: TextStyle(color: palette.mutedText),
+                  ),
                 );
               }
-              return Column(
+              return SettingsSection(
                 children: [
                   for (final m in models)
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.memory),
-                        title: Text(m.name),
-                        subtitle: m.sizeBytes != null ? Text(formatBytes(m.sizeBytes!)) : null,
-                        trailing: hardwareAsync.maybeWhen(
-                          data: (hw) => FitBadge(
-                            fit: modelRecommendationService.assess(
-                              modelFileSizeBytes: m.sizeBytes,
-                              hardware: hw,
+                    SettingsRow(
+                      title: m.name,
+                      subtitle: m.sizeBytes != null ? formatBytes(m.sizeBytes!) : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          hardwareAsync.maybeWhen(
+                            data: (hw) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FitBadge(
+                                fit: modelRecommendationService.assess(
+                                  modelFileSizeBytes: m.sizeBytes,
+                                  hardware: hw,
+                                ),
+                              ),
                             ),
+                            orElse: () => const SizedBox.shrink(),
                           ),
-                          orElse: () => const SizedBox.shrink(),
-                        ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Delete model',
+                            onPressed: () async {
+                              final confirmed = await _confirm(
+                                context,
+                                title: 'Delete model?',
+                                content: 'This removes "${m.name}". This cannot be undone.',
+                              );
+                              if (!confirmed) return;
+                              await ref.read(modelActionsProvider).deleteModel(m.name);
+                            },
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -82,7 +161,7 @@ class InstalledModelsTab extends ConsumerWidget {
             ),
             error: (e, _) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text('Could not reach Ollama: $e'),
+              child: Text('Could not list installed models: $e'),
             ),
           ),
         ],
@@ -98,6 +177,7 @@ class _HardwareBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final parts = <String>[
       '${hardware.cpuCores} CPU cores',
       if (hardware.totalRamBytes != null) '${formatBytes(hardware.totalRamBytes!)} RAM',
@@ -106,12 +186,21 @@ class _HardwareBanner extends StatelessWidget {
     ];
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(8),
+        color: palette.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.cardBorder),
       ),
-      child: Text(parts.join(' · ')),
+      child: Row(
+        children: [
+          Icon(Icons.memory, size: 18, color: palette.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(parts.join(' · '), style: TextStyle(color: palette.textPrimary, fontSize: 13)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -124,39 +213,57 @@ class _DownloadCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(state.label, overflow: TextOverflow.ellipsis)),
-                if (state.done || state.error != null)
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => ref.read(downloadManagerProvider.notifier).dismiss(downloadKey),
-                  ),
-              ],
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  state.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: palette.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+              if (state.done || state.error != null)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => ref.read(downloadManagerProvider.notifier).dismiss(downloadKey),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (state.error != null)
+            Text(state.error!, style: TextStyle(color: palette.danger, fontSize: 12.5))
+          else if (state.done)
+            Text('Installed', style: TextStyle(color: palette.success, fontSize: 12.5))
+          else ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: state.fraction,
+                backgroundColor: palette.inputFill,
+                color: palette.accent,
+                minHeight: 5,
+              ),
             ),
             const SizedBox(height: 4),
-            if (state.error != null)
-              Text(state.error!, style: TextStyle(color: Theme.of(context).colorScheme.error))
-            else if (state.done)
-              const Text('Installed')
-            else ...[
-              LinearProgressIndicator(value: state.fraction),
-              const SizedBox(height: 4),
-              Text(
-                state.totalBytes != null
-                    ? '${formatBytes(state.receivedBytes)} / ${formatBytes(state.totalBytes!)}'
-                    : formatBytes(state.receivedBytes),
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-            ],
+            Text(
+              state.totalBytes != null
+                  ? '${formatBytes(state.receivedBytes)} / ${formatBytes(state.totalBytes!)}'
+                  : formatBytes(state.receivedBytes),
+              style: TextStyle(color: palette.mutedText, fontSize: 11.5),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

@@ -1,14 +1,13 @@
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/di/providers.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/theme/theme_mode_controller.dart';
 import '../../domain/entities/app_settings.dart';
 import '../models/model_library_controller.dart';
-
-final watchedSettingsProvider = StreamProvider<AppSettings>((ref) {
-  return ref.watch(chatRepositoryProvider).watchSettings();
-});
+import '../shared/widgets/settings_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -20,8 +19,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _baseUrlController = TextEditingController();
   final _portController = TextEditingController();
-  final _modelController = TextEditingController();
+  final _ollamaModelController = TextEditingController();
   final _systemPromptController = TextEditingController();
+  final _keepAliveController = TextEditingController();
   bool _initialized = false;
   bool _testing = false;
   String? _testResult;
@@ -30,8 +30,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void dispose() {
     _baseUrlController.dispose();
     _portController.dispose();
-    _modelController.dispose();
+    _ollamaModelController.dispose();
     _systemPromptController.dispose();
+    _keepAliveController.dispose();
     super.dispose();
   }
 
@@ -40,8 +41,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _initialized = true;
     _baseUrlController.text = settings.ollamaBaseUrl;
     _portController.text = settings.ollamaPort.toString();
-    _modelController.text = settings.defaultOllamaModel ?? '';
+    _ollamaModelController.text = settings.defaultOllamaModel ?? '';
     _systemPromptController.text = settings.globalSystemPrompt ?? '';
+    _keepAliveController.text = settings.modelKeepAliveMinutes.toString();
   }
 
   Future<void> _save() async {
@@ -50,9 +52,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await repo.updateSettings(current.copyWith(
       ollamaBaseUrl: _baseUrlController.text.trim(),
       ollamaPort: int.tryParse(_portController.text.trim()) ?? current.ollamaPort,
-      defaultOllamaModel: _modelController.text.trim(),
+      defaultOllamaModel: _ollamaModelController.text.trim(),
       globalSystemPrompt: _systemPromptController.text,
+      modelKeepAliveMinutes:
+          int.tryParse(_keepAliveController.text.trim()) ?? current.modelKeepAliveMinutes,
     ));
+    ref.invalidate(installedModelsProvider);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings saved')));
     }
@@ -75,72 +80,124 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settingsAsync = ref.watch(watchedSettingsProvider);
+    final settingsAsync = ref.watch(appSettingsProvider);
+    final palette = context.palette;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: settingsAsync.when(
         data: (settings) {
           _populateIfNeeded(settings);
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             children: [
-              Text('Ollama connection', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _baseUrlController,
-                decoration: const InputDecoration(labelText: 'Base URL', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _portController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Port', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _modelController,
-                decoration: const InputDecoration(
-                  labelText: 'Default model (e.g. llama3.2)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              _InstalledModelChips(
-                onPicked: (name) => setState(() => _modelController.text = name),
-              ),
-              const SizedBox(height: 8),
-              Row(
+              SettingsSection(
+                title: 'Ollama connection',
                 children: [
-                  OutlinedButton(
-                    onPressed: _testing ? null : _testConnection,
-                    child: _testing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Test connection'),
+                  SettingsRow(
+                    title: 'Server address',
+                    subtitle: 'Base URL of your local Ollama server.',
+                    trailing: TextField(controller: _baseUrlController, textAlign: TextAlign.end),
+                    trailingWidth: 220,
                   ),
-                  const SizedBox(width: 12),
-                  if (_testResult != null) Expanded(child: Text(_testResult!)),
+                  SettingsRow(
+                    title: 'Port',
+                    trailing: TextField(
+                      controller: _portController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.end,
+                    ),
+                    trailingWidth: 100,
+                  ),
+                  SettingsRow(
+                    title: 'Default model',
+                    subtitle: 'Used for new chats unless overridden.',
+                    trailing: TextField(
+                      controller: _ollamaModelController,
+                      textAlign: TextAlign.end,
+                      decoration: const InputDecoration(hintText: 'e.g. llama3.2'),
+                    ),
+                    trailingWidth: 220,
+                  ),
+                  if (_hasInstalledModels)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: _InstalledModelDropdown(
+                          selected: _ollamaModelController.text,
+                          onPicked: (name) async {
+                            setState(() => _ollamaModelController.text = name);
+                            final repo = ref.read(chatRepositoryProvider);
+                            final current = await repo.getSettings();
+                            await repo.updateSettings(current.copyWith(defaultOllamaModel: name));
+                          },
+                        ),
+                      ),
+                    ),
+                  SettingsRow(
+                    title: 'Connection test',
+                    subtitle: _testResult ?? 'Verify LocalAi can reach the server above.',
+                    trailing: OutlinedButton(
+                      onPressed: _testing ? null : _testConnection,
+                      child: _testing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Test connection'),
+                    ),
+                  ),
+                  SettingsRow(
+                    title: 'Unload model after',
+                    subtitle: 'Minutes of inactivity before Ollama frees the model from '
+                        'memory. Use 0 to keep it loaded forever.',
+                    trailing: TextField(
+                      controller: _keepAliveController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.end,
+                      decoration: const InputDecoration(suffixText: 'min'),
+                    ),
+                    trailingWidth: 100,
+                  ),
                 ],
               ),
-              const Divider(height: 32),
-              Text('Global system prompt', style: Theme.of(context).textTheme.titleMedium),
+              SettingsSection(
+                title: 'Chat',
+                children: [
+                  SettingsBlockRow(
+                    title: 'Global system prompt',
+                    subtitle: 'Applied to every conversation unless overridden.',
+                    child: TextField(
+                      controller: _systemPromptController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(hintText: 'You are a helpful assistant…'),
+                    ),
+                  ),
+                ],
+              ),
+              SettingsSection(
+                title: 'Appearance',
+                children: [
+                  SettingsRow(
+                    title: 'Theme',
+                    subtitle: 'Match your system, or pin light/dark.',
+                    trailing: const _ThemeModeSelector(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: _save, child: const Text('Save settings')),
+              ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _systemPromptController,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: 'Applied to every conversation unless overridden.',
-                  border: OutlineInputBorder(),
+              Center(
+                child: Text(
+                  'LocalAi · offline-first',
+                  style: TextStyle(color: palette.groupLabel, fontSize: 11.5),
                 ),
               ),
-              const Divider(height: 32),
-              Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              const _ThemeModeSelector(),
-              const SizedBox(height: 24),
-              FilledButton(onPressed: _save, child: const Text('Save settings')),
             ],
           );
         },
@@ -149,36 +206,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+
+  bool get _hasInstalledModels {
+    return ref.watch(installedModelsProvider).maybeWhen(
+          data: (models) => models.isNotEmpty,
+          orElse: () => false,
+        );
+  }
 }
 
-class _InstalledModelChips extends ConsumerWidget {
-  const _InstalledModelChips({required this.onPicked});
+class _InstalledModelDropdown extends ConsumerStatefulWidget {
+  const _InstalledModelDropdown({required this.selected, required this.onPicked});
 
+  final String selected;
   final ValueChanged<String> onPicked;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_InstalledModelDropdown> createState() => _InstalledModelDropdownState();
+}
+
+class _InstalledModelDropdownState extends ConsumerState<_InstalledModelDropdown> {
+  final _value = ValueNotifier<String?>(null);
+
+  @override
+  void dispose() {
+    _value.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final modelsAsync = ref.watch(installedModelsProvider);
-    return modelsAsync.when(
+    return modelsAsync.maybeWhen(
       data: (models) {
         if (models.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final m in models)
-                ActionChip(label: Text(m.name), onPressed: () => onPicked(m.name)),
-            ],
+        final names = [for (final m in models) m.name];
+        _value.value = names.contains(widget.selected) ? widget.selected : null;
+        return SizedBox(
+          // width: 260,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton2<String>(
+              isDense: true,
+              isExpanded: true,
+              valueListenable: _value,
+              hint: const Text('Installed models', overflow: TextOverflow.ellipsis),
+              items: [
+                for (final name in names)
+                  DropdownItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (name) {
+                if (name != null) widget.onPicked(name);
+              },
+              buttonStyleData: const ButtonStyleData(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                height: 40,
+              ),
+              dropdownStyleData: DropdownStyleData(
+                maxHeight: 300,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ),
         );
       },
-      loading: () => const Padding(
-        padding: EdgeInsets.only(top: 8),
-        child: LinearProgressIndicator(),
-      ),
-      error: (_, _) => const SizedBox.shrink(),
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }
@@ -190,10 +281,11 @@ class _ThemeModeSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeControllerProvider);
     return SegmentedButton<ThemeMode>(
+      showSelectedIcon: false,
       segments: const [
-        ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto)),
-        ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode)),
-        ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode)),
+        ButtonSegment(value: ThemeMode.system, label: Text('System')),
+        ButtonSegment(value: ThemeMode.light, label: Text('Light')),
+        ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
       ],
       selected: {mode},
       onSelectionChanged: (selection) {

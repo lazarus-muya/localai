@@ -11,6 +11,7 @@ import '../../data/local/database/app_database.dart';
 import '../../data/remote/huggingface/huggingface_api_client.dart';
 import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/engine/ollama_engine.dart';
+import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/hardware_profile.dart';
 import '../../domain/repositories/chat_repository.dart';
 
@@ -22,6 +23,14 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepositoryImpl(ref.watch(appDatabaseProvider));
+});
+
+/// Live app settings, shared across screens so a change made in one place
+/// (e.g. switching engine mode in Settings) is immediately reflected
+/// anywhere else that watches it, including screens kept alive in the
+/// adaptive shell's [StatefulShellRoute.indexedStack].
+final appSettingsProvider = StreamProvider<AppSettings>((ref) {
+  return ref.watch(chatRepositoryProvider).watchSettings();
 });
 
 final dioProvider = Provider<Dio>((ref) => Dio());

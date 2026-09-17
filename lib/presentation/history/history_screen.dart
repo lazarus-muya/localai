@@ -34,11 +34,48 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
+  Future<bool> _confirmDeleteAll(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete all chats?'),
+        content: const Text('This permanently deletes every conversation. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversationsAsync = ref.watch(conversationsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
+      appBar: AppBar(
+        title: const Text('History'),
+        actions: [
+          conversationsAsync.maybeWhen(
+            data: (conversations) => conversations.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: const Icon(Icons.delete_sweep),
+                    tooltip: 'Delete all chats',
+                    onPressed: () async {
+                      final confirmed = await _confirmDeleteAll(context);
+                      if (!confirmed) return;
+                      await ref.read(historyActionsProvider).deleteAll();
+                    },
+                  ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/chat'),
         icon: const Icon(Icons.add),

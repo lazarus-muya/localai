@@ -8,6 +8,7 @@ abstract class ChatRepository {
   Future<Conversation> createConversation({String title, String? systemPromptOverride});
   Future<void> renameConversation(String id, String title);
   Future<void> deleteConversation(String id);
+  Future<void> deleteAllConversations();
   Future<void> touchConversation(String id);
 
   Stream<List<ChatMessage>> watchMessages(String conversationId);

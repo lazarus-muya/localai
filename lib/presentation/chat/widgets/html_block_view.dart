@@ -35,11 +35,18 @@ class HtmlBlockView extends StatelessWidget {
                   icon: const Icon(Icons.copy, size: 16),
                   tooltip: 'Copy HTML',
                   visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: html));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('HTML copied'), duration: Duration(seconds: 1)),
-                    );
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await Clipboard.setData(ClipboardData(text: html));
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('HTML copied'), duration: Duration(seconds: 1)),
+                      );
+                    } catch (_) {
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Copy failed'), duration: Duration(seconds: 1)),
+                      );
+                    }
                   },
                 ),
               ],

@@ -7,33 +7,61 @@ import '../../presentation/models/model_library_screen.dart';
 import '../../presentation/settings/settings_screen.dart';
 import '../adaptive/adaptive_shell.dart';
 
+/// Every route below renders as a [NoTransitionPage]. Top-level destinations
+/// live in their own [StatefulShellBranch] and are swapped by an
+/// [IndexedStack] inside [AdaptiveShell] — an instant, stateful tab switch
+/// rather than a pushed route, which is what native bottom-nav/sidebar apps
+/// do (and avoids the Material "zoom" page transition reading as an
+/// unwanted scale effect). The chat branch's two routes (new vs. existing
+/// conversation) are the same screen gaining an id in the URL, so they stay
+/// transition-free too instead of animating as if navigating to a new page.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/chat',
     routes: [
-      ShellRoute(
-        builder: (context, state, child) =>
-            AdaptiveShell(location: state.uri.toString(), child: child),
-        routes: [
-          GoRoute(
-            path: '/chat',
-            builder: (context, state) => const ChatScreen(conversationId: null),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AdaptiveShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/chat',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: ChatScreen(conversationId: null)),
+              ),
+              GoRoute(
+                path: '/chat/:id',
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: ChatScreen(conversationId: state.pathParameters['id']),
+                ),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/chat/:id',
-            builder: (context, state) => ChatScreen(conversationId: state.pathParameters['id']),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/history',
+                pageBuilder: (context, state) => const NoTransitionPage(child: HistoryScreen()),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/history',
-            builder: (context, state) => const HistoryScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/models',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: ModelLibraryScreen()),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/models',
-            builder: (context, state) => const ModelLibraryScreen(),
-          ),
-          GoRoute(
-            path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                pageBuilder: (context, state) => const NoTransitionPage(child: SettingsScreen()),
+              ),
+            ],
           ),
         ],
       ),

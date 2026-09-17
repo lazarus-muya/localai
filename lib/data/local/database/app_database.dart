@@ -43,6 +43,7 @@ class AppSettingsTable extends Table {
   IntColumn get ollamaPort => integer().withDefault(const Constant(11434))();
   TextColumn get globalSystemPrompt => text().nullable()();
   TextColumn get defaultOllamaModel => text().nullable()();
+  IntColumn get modelKeepAliveMinutes => integer().withDefault(const Constant(20))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -53,7 +54,30 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'localai_db'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 5;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(appSettingsTable, appSettingsTable.modelKeepAliveMinutes);
+          }
+          if (from == 3) {
+            // Only version 3 databases ever had this column (added and
+            // dropped within the same unreleased dev cycle).
+            await m.dropColumn(appSettingsTable, 'llama_library_path');
+          }
+          if (from < 5) {
+            // The in-app (on-device) llama.cpp engine has been removed —
+            // chat always goes through a remote Ollama server now.
+            if (from >= 3) {
+              await m.dropColumn(appSettingsTable, 'engine_mode');
+              await m.dropColumn(appSettingsTable, 'default_local_model');
+            }
+          }
+        },
+      );
 
   Stream<List<ConversationRow>> watchConversations() {
     return (select(conversations)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
@@ -70,6 +94,11 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteConversation(String id) async {
     await (delete(messages)..where((t) => t.conversationId.equals(id))).go();
     await (delete(conversations)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteAllConversations() async {
+    await delete(messages).go();
+    await delete(conversations).go();
   }
 
   Stream<List<MessageRow>> watchMessages(String conversationId) {

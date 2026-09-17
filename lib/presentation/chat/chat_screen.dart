@@ -71,7 +71,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
                           itemCount: messages.length,
-                          itemBuilder: (context, index) => MessageBubble(message: messages[index]),
+                          itemBuilder: (context, index) => MessageBubble(
+                            message: messages[index],
+                            isModelWarm: uiState.isModelWarm,
+                          ),
                         );
                       },
                       loading: () => const Center(child: CircularProgressIndicator()),

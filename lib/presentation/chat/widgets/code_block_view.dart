@@ -47,11 +47,18 @@ class CodeBlockView extends StatelessWidget {
                   icon: const Icon(Icons.copy, size: 16),
                   tooltip: 'Copy code',
                   visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Code copied'), duration: Duration(seconds: 1)),
-                    );
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await Clipboard.setData(ClipboardData(text: code));
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Code copied'), duration: Duration(seconds: 1)),
+                      );
+                    } catch (_) {
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Copy failed'), duration: Duration(seconds: 1)),
+                      );
+                    }
                   },
                 ),
               ],

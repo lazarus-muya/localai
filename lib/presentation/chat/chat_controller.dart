@@ -10,6 +10,24 @@ import '../../domain/entities/inference_settings.dart';
 import '../../domain/entities/message.dart';
 
 const _uuid = Uuid();
+const _titleMaxLength = 48;
+
+/// Derives a short conversation title from a user's first prompt, so new
+/// chats are labeled by what they're about instead of a generic "New chat".
+/// Takes the first non-empty line and truncates it at a word boundary.
+String titleFromPrompt(String prompt) {
+  final firstLine = prompt
+      .split('\n')
+      .map((line) => line.trim())
+      .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+  if (firstLine.isEmpty) return 'New chat';
+  if (firstLine.length <= _titleMaxLength) return firstLine;
+
+  final truncated = firstLine.substring(0, _titleMaxLength);
+  final lastSpace = truncated.lastIndexOf(' ');
+  final cut = lastSpace > _titleMaxLength ~/ 2 ? truncated.substring(0, lastSpace) : truncated;
+  return '$cut…';
+}
 
 final conversationMessagesProvider =
     StreamProvider.family<List<ChatMessage>, String>((ref, conversationId) {
@@ -17,15 +35,23 @@ final conversationMessagesProvider =
 });
 
 class ChatUiState {
-  const ChatUiState({this.isSending = false, this.errorMessage});
+  const ChatUiState({this.isSending = false, this.errorMessage, this.isModelWarm});
 
   final bool isSending;
   final String? errorMessage;
+
+  /// Whether the model was already resident in Ollama's memory when the
+  /// in-flight send started. `null` means unknown (checking it failed, e.g.
+  /// an older Ollama server without `/api/ps`) — the UI falls back to a
+  /// time-based guess in that case.
+  final bool? isModelWarm;
 }
 
 /// Orchestrates a single conversation's send/stream/cancel lifecycle. Keyed
 /// by conversation id; `null` means "not-yet-created" — the first sent
-/// message creates the conversation and the caller navigates to its id.
+/// message creates the conversation, returns its id immediately for
+/// navigation, and hands the actual send/stream off to that id's own
+/// controller instance.
 class ChatController extends Notifier<ChatUiState> {
   ChatController(this.arg);
 
@@ -38,32 +64,73 @@ class ChatController extends Notifier<ChatUiState> {
     return const ChatUiState();
   }
 
-  Future<String> _ensureConversation() async {
-    if (arg != null) return arg!;
-    final conversation = await ref.read(chatRepositoryProvider).createConversation();
-    return conversation.id;
-  }
-
   /// Sends [text]. Returns the conversation id when a brand-new conversation
-  /// was created by this call (so the UI can navigate to it), otherwise null.
+  /// was created by this call (so the UI can navigate to it right away),
+  /// otherwise null.
+  ///
+  /// For a brand-new conversation the id is created and returned immediately,
+  /// and the actual send/stream is handed off to that conversation's own
+  /// controller instance — so the UI can navigate there before the response
+  /// starts streaming, instead of only seeing progress once the whole
+  /// response has finished.
   Future<String?> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return null;
 
-    final repo = ref.read(chatRepositoryProvider);
-    final engine = ref.read(ollamaEngineProvider);
-    final settings = await repo.getSettings();
-    final wasNew = arg == null;
-    final conversationId = await _ensureConversation();
+    if (arg == null) {
+      final conversation = await ref
+          .read(chatRepositoryProvider)
+          .createConversation(title: titleFromPrompt(trimmed));
+      unawaited(
+        ref.read(chatControllerProvider(conversation.id).notifier)._send(trimmed),
+      );
+      return conversation.id;
+    }
 
-    if (settings.defaultOllamaModel == null || settings.defaultOllamaModel!.trim().isEmpty) {
+    await _send(trimmed);
+    return null;
+  }
+
+  Future<void> _send(String trimmed) async {
+    final conversationId = arg!;
+    final repo = ref.read(chatRepositoryProvider);
+    var settings = await repo.getSettings();
+    final engine = ref.read(ollamaEngineProvider);
+    final baseUrl = settings.ollamaServerUrl;
+
+    var modelName = settings.defaultOllamaModel;
+
+    if (modelName == null || modelName.trim().isEmpty) {
+      // No default model chosen yet — fall back to the first model already
+      // installed, if any, rather than blocking the chat.
+      try {
+        final installed = await engine.listModels(baseUrl: baseUrl);
+        if (installed.isNotEmpty) {
+          modelName = installed.first.name;
+          settings = settings.copyWith(defaultOllamaModel: modelName);
+          await repo.updateSettings(settings);
+        }
+      } catch (_) {
+        // Ignore — handled by the empty-model check below.
+      }
+    }
+
+    if (modelName == null || modelName.trim().isEmpty) {
       state = const ChatUiState(
         errorMessage: 'Set a default Ollama model in Settings before starting a chat.',
       );
-      return wasNew ? conversationId : null;
+      return;
     }
 
-    state = const ChatUiState(isSending: true);
+    bool? isModelWarm;
+    try {
+      isModelWarm = await engine.isModelLoaded(baseUrl: baseUrl, model: modelName);
+    } catch (_) {
+      // Unreachable server — fall back to the UI's own time-based guess
+      // instead of failing the send.
+    }
+
+    state = ChatUiState(isSending: true, isModelWarm: isModelWarm);
 
     final now = DateTime.now();
     await repo.saveMessage(ChatMessage(
@@ -106,11 +173,14 @@ class ChatController extends Notifier<ChatUiState> {
 
     String? errorMessage;
     try {
-      final inferenceSettings = InferenceSettings(systemPrompt: settings.globalSystemPrompt);
+      final inferenceSettings = InferenceSettings(
+        systemPrompt: settings.globalSystemPrompt,
+        keepAliveMinutes: settings.modelKeepAliveMinutes,
+      );
 
       await for (final delta in engine.chatStream(
-        baseUrl: settings.ollamaServerUrl,
-        model: settings.defaultOllamaModel!,
+        baseUrl: baseUrl,
+        model: modelName,
         messages: turns,
         settings: inferenceSettings,
         cancelSignal: cancelSignal,
@@ -161,8 +231,6 @@ class ChatController extends Notifier<ChatUiState> {
       await repo.touchConversation(conversationId);
       state = ChatUiState(isSending: false, errorMessage: errorMessage);
     }
-
-    return wasNew ? conversationId : null;
   }
 
   void cancel() => _activeCancelSignal?.cancel();

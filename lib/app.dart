@@ -14,7 +14,7 @@ class LocalAiApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeControllerProvider);
 
     return MaterialApp.router(
-      title: 'LocalAI',
+      title: 'LocalAi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

@@ -13,6 +13,7 @@ class InferenceSettings {
     this.seed,
     this.stopSequences = const [],
     this.systemPrompt,
+    this.keepAliveMinutes = 20,
   });
 
   final double temperature;
@@ -24,4 +25,8 @@ class InferenceSettings {
   final int? seed;
   final List<String> stopSequences;
   final String? systemPrompt;
+
+  /// How long Ollama should keep the model loaded after this request.
+  /// `0` means "never unload".
+  final int keepAliveMinutes;
 }

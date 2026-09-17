@@ -1188,6 +1188,17 @@ class $AppSettingsTableTable extends AppSettingsTable
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _modelKeepAliveMinutesMeta =
+      const VerificationMeta('modelKeepAliveMinutes');
+  @override
+  late final GeneratedColumn<int> modelKeepAliveMinutes = GeneratedColumn<int>(
+    'model_keep_alive_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(20),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1195,6 +1206,7 @@ class $AppSettingsTableTable extends AppSettingsTable
     ollamaPort,
     globalSystemPrompt,
     defaultOllamaModel,
+    modelKeepAliveMinutes,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1244,6 +1256,15 @@ class $AppSettingsTableTable extends AppSettingsTable
         ),
       );
     }
+    if (data.containsKey('model_keep_alive_minutes')) {
+      context.handle(
+        _modelKeepAliveMinutesMeta,
+        modelKeepAliveMinutes.isAcceptableOrUnknown(
+          data['model_keep_alive_minutes']!,
+          _modelKeepAliveMinutesMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1273,6 +1294,10 @@ class $AppSettingsTableTable extends AppSettingsTable
         DriftSqlType.string,
         data['${effectivePrefix}default_ollama_model'],
       ),
+      modelKeepAliveMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}model_keep_alive_minutes'],
+      )!,
     );
   }
 
@@ -1288,12 +1313,14 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
   final int ollamaPort;
   final String? globalSystemPrompt;
   final String? defaultOllamaModel;
+  final int modelKeepAliveMinutes;
   const SettingsRow({
     required this.id,
     required this.ollamaBaseUrl,
     required this.ollamaPort,
     this.globalSystemPrompt,
     this.defaultOllamaModel,
+    required this.modelKeepAliveMinutes,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1307,6 +1334,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     if (!nullToAbsent || defaultOllamaModel != null) {
       map['default_ollama_model'] = Variable<String>(defaultOllamaModel);
     }
+    map['model_keep_alive_minutes'] = Variable<int>(modelKeepAliveMinutes);
     return map;
   }
 
@@ -1321,6 +1349,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       defaultOllamaModel: defaultOllamaModel == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultOllamaModel),
+      modelKeepAliveMinutes: Value(modelKeepAliveMinutes),
     );
   }
 
@@ -1339,6 +1368,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       defaultOllamaModel: serializer.fromJson<String?>(
         json['defaultOllamaModel'],
       ),
+      modelKeepAliveMinutes: serializer.fromJson<int>(
+        json['modelKeepAliveMinutes'],
+      ),
     );
   }
   @override
@@ -1350,6 +1382,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       'ollamaPort': serializer.toJson<int>(ollamaPort),
       'globalSystemPrompt': serializer.toJson<String?>(globalSystemPrompt),
       'defaultOllamaModel': serializer.toJson<String?>(defaultOllamaModel),
+      'modelKeepAliveMinutes': serializer.toJson<int>(modelKeepAliveMinutes),
     };
   }
 
@@ -1359,6 +1392,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     int? ollamaPort,
     Value<String?> globalSystemPrompt = const Value.absent(),
     Value<String?> defaultOllamaModel = const Value.absent(),
+    int? modelKeepAliveMinutes,
   }) => SettingsRow(
     id: id ?? this.id,
     ollamaBaseUrl: ollamaBaseUrl ?? this.ollamaBaseUrl,
@@ -1369,6 +1403,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     defaultOllamaModel: defaultOllamaModel.present
         ? defaultOllamaModel.value
         : this.defaultOllamaModel,
+    modelKeepAliveMinutes: modelKeepAliveMinutes ?? this.modelKeepAliveMinutes,
   );
   SettingsRow copyWithCompanion(AppSettingsTableCompanion data) {
     return SettingsRow(
@@ -1385,6 +1420,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       defaultOllamaModel: data.defaultOllamaModel.present
           ? data.defaultOllamaModel.value
           : this.defaultOllamaModel,
+      modelKeepAliveMinutes: data.modelKeepAliveMinutes.present
+          ? data.modelKeepAliveMinutes.value
+          : this.modelKeepAliveMinutes,
     );
   }
 
@@ -1395,7 +1433,8 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           ..write('ollamaBaseUrl: $ollamaBaseUrl, ')
           ..write('ollamaPort: $ollamaPort, ')
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
-          ..write('defaultOllamaModel: $defaultOllamaModel')
+          ..write('defaultOllamaModel: $defaultOllamaModel, ')
+          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes')
           ..write(')'))
         .toString();
   }
@@ -1407,6 +1446,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     ollamaPort,
     globalSystemPrompt,
     defaultOllamaModel,
+    modelKeepAliveMinutes,
   );
   @override
   bool operator ==(Object other) =>
@@ -1416,7 +1456,8 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           other.ollamaBaseUrl == this.ollamaBaseUrl &&
           other.ollamaPort == this.ollamaPort &&
           other.globalSystemPrompt == this.globalSystemPrompt &&
-          other.defaultOllamaModel == this.defaultOllamaModel);
+          other.defaultOllamaModel == this.defaultOllamaModel &&
+          other.modelKeepAliveMinutes == this.modelKeepAliveMinutes);
 }
 
 class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
@@ -1425,12 +1466,14 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
   final Value<int> ollamaPort;
   final Value<String?> globalSystemPrompt;
   final Value<String?> defaultOllamaModel;
+  final Value<int> modelKeepAliveMinutes;
   const AppSettingsTableCompanion({
     this.id = const Value.absent(),
     this.ollamaBaseUrl = const Value.absent(),
     this.ollamaPort = const Value.absent(),
     this.globalSystemPrompt = const Value.absent(),
     this.defaultOllamaModel = const Value.absent(),
+    this.modelKeepAliveMinutes = const Value.absent(),
   });
   AppSettingsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -1438,6 +1481,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     this.ollamaPort = const Value.absent(),
     this.globalSystemPrompt = const Value.absent(),
     this.defaultOllamaModel = const Value.absent(),
+    this.modelKeepAliveMinutes = const Value.absent(),
   });
   static Insertable<SettingsRow> custom({
     Expression<int>? id,
@@ -1445,6 +1489,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Expression<int>? ollamaPort,
     Expression<String>? globalSystemPrompt,
     Expression<String>? defaultOllamaModel,
+    Expression<int>? modelKeepAliveMinutes,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1454,6 +1499,8 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
         'global_system_prompt': globalSystemPrompt,
       if (defaultOllamaModel != null)
         'default_ollama_model': defaultOllamaModel,
+      if (modelKeepAliveMinutes != null)
+        'model_keep_alive_minutes': modelKeepAliveMinutes,
     });
   }
 
@@ -1463,6 +1510,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Value<int>? ollamaPort,
     Value<String?>? globalSystemPrompt,
     Value<String?>? defaultOllamaModel,
+    Value<int>? modelKeepAliveMinutes,
   }) {
     return AppSettingsTableCompanion(
       id: id ?? this.id,
@@ -1470,6 +1518,8 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
       ollamaPort: ollamaPort ?? this.ollamaPort,
       globalSystemPrompt: globalSystemPrompt ?? this.globalSystemPrompt,
       defaultOllamaModel: defaultOllamaModel ?? this.defaultOllamaModel,
+      modelKeepAliveMinutes:
+          modelKeepAliveMinutes ?? this.modelKeepAliveMinutes,
     );
   }
 
@@ -1491,6 +1541,11 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     if (defaultOllamaModel.present) {
       map['default_ollama_model'] = Variable<String>(defaultOllamaModel.value);
     }
+    if (modelKeepAliveMinutes.present) {
+      map['model_keep_alive_minutes'] = Variable<int>(
+        modelKeepAliveMinutes.value,
+      );
+    }
     return map;
   }
 
@@ -1501,7 +1556,8 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
           ..write('ollamaBaseUrl: $ollamaBaseUrl, ')
           ..write('ollamaPort: $ollamaPort, ')
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
-          ..write('defaultOllamaModel: $defaultOllamaModel')
+          ..write('defaultOllamaModel: $defaultOllamaModel, ')
+          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes')
           ..write(')'))
         .toString();
   }
@@ -2310,6 +2366,7 @@ typedef $$AppSettingsTableTableCreateCompanionBuilder =
       Value<int> ollamaPort,
       Value<String?> globalSystemPrompt,
       Value<String?> defaultOllamaModel,
+      Value<int> modelKeepAliveMinutes,
     });
 typedef $$AppSettingsTableTableUpdateCompanionBuilder =
     AppSettingsTableCompanion Function({
@@ -2318,6 +2375,7 @@ typedef $$AppSettingsTableTableUpdateCompanionBuilder =
       Value<int> ollamaPort,
       Value<String?> globalSystemPrompt,
       Value<String?> defaultOllamaModel,
+      Value<int> modelKeepAliveMinutes,
     });
 
 class $$AppSettingsTableTableFilterComposer
@@ -2351,6 +2409,11 @@ class $$AppSettingsTableTableFilterComposer
 
   ColumnFilters<String> get defaultOllamaModel => $composableBuilder(
     column: $table.defaultOllamaModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get modelKeepAliveMinutes => $composableBuilder(
+    column: $table.modelKeepAliveMinutes,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2388,6 +2451,11 @@ class $$AppSettingsTableTableOrderingComposer
     column: $table.defaultOllamaModel,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get modelKeepAliveMinutes => $composableBuilder(
+    column: $table.modelKeepAliveMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableTableAnnotationComposer
@@ -2419,6 +2487,11 @@ class $$AppSettingsTableTableAnnotationComposer
 
   GeneratedColumn<String> get defaultOllamaModel => $composableBuilder(
     column: $table.defaultOllamaModel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get modelKeepAliveMinutes => $composableBuilder(
+    column: $table.modelKeepAliveMinutes,
     builder: (column) => column,
   );
 }
@@ -2461,12 +2534,14 @@ class $$AppSettingsTableTableTableManager
                 Value<int> ollamaPort = const Value.absent(),
                 Value<String?> globalSystemPrompt = const Value.absent(),
                 Value<String?> defaultOllamaModel = const Value.absent(),
+                Value<int> modelKeepAliveMinutes = const Value.absent(),
               }) => AppSettingsTableCompanion(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
                 ollamaPort: ollamaPort,
                 globalSystemPrompt: globalSystemPrompt,
                 defaultOllamaModel: defaultOllamaModel,
+                modelKeepAliveMinutes: modelKeepAliveMinutes,
               ),
           createCompanionCallback:
               ({
@@ -2475,12 +2550,14 @@ class $$AppSettingsTableTableTableManager
                 Value<int> ollamaPort = const Value.absent(),
                 Value<String?> globalSystemPrompt = const Value.absent(),
                 Value<String?> defaultOllamaModel = const Value.absent(),
+                Value<int> modelKeepAliveMinutes = const Value.absent(),
               }) => AppSettingsTableCompanion.insert(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
                 ollamaPort: ollamaPort,
                 globalSystemPrompt: globalSystemPrompt,
                 defaultOllamaModel: defaultOllamaModel,
+                modelKeepAliveMinutes: modelKeepAliveMinutes,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

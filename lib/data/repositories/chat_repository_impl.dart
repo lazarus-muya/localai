@@ -42,6 +42,7 @@ class ChatRepositoryImpl implements ChatRepository {
         ollamaPort: row.ollamaPort,
         globalSystemPrompt: row.globalSystemPrompt,
         defaultOllamaModel: row.defaultOllamaModel,
+        modelKeepAliveMinutes: row.modelKeepAliveMinutes,
       );
 
   @override
@@ -86,6 +87,9 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> deleteConversation(String id) => _db.deleteConversation(id);
+
+  @override
+  Future<void> deleteAllConversations() => _db.deleteAllConversations();
 
   @override
   Future<void> touchConversation(String id) async {
@@ -136,6 +140,7 @@ class ChatRepositoryImpl implements ChatRepository {
       ollamaPort: Value(settings.ollamaPort),
       globalSystemPrompt: Value(settings.globalSystemPrompt),
       defaultOllamaModel: Value(settings.defaultOllamaModel),
+      modelKeepAliveMinutes: Value(settings.modelKeepAliveMinutes),
     ));
   }
 }

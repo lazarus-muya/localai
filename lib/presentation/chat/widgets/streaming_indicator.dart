@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// Shows "Thinking…" while waiting for the first token, then switches to a
-/// "loading the model" message if nothing has arrived after a few seconds —
-/// distinguishing a normal cold-start delay from the model actually working.
+/// Shows "Thinking…" while waiting for the first token. When the caller
+/// knows (via [isModelWarm]) whether Ollama already had the model resident
+/// in memory, that's authoritative: a warm model never shows the "loading"
+/// message, and a cold one shows it immediately. Otherwise falls back to
+/// guessing from elapsed time, which just means "this is taking a while".
 class StreamingIndicator extends StatefulWidget {
-  const StreamingIndicator({super.key, required this.since});
+  const StreamingIndicator({super.key, required this.since, this.isModelWarm});
 
   final DateTime since;
+  final bool? isModelWarm;
 
   @override
   State<StreamingIndicator> createState() => _StreamingIndicatorState();
@@ -36,7 +39,11 @@ class _StreamingIndicatorState extends State<StreamingIndicator> {
 
   @override
   Widget build(BuildContext context) {
-    final label = _elapsed.inSeconds < 4 ? 'Thinking…' : 'Loading model into memory…';
+    final label = switch (widget.isModelWarm) {
+      true => 'Thinking…',
+      false => 'Loading model into memory…',
+      null => _elapsed.inSeconds < 4 ? 'Thinking…' : 'Loading model into memory…',
+    };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

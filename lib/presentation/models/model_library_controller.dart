@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/di/providers.dart';
+import '../../data/local/models_directory.dart';
 import '../../data/remote/huggingface/huggingface_models.dart';
 import '../../domain/entities/hardware_profile.dart';
 import '../../domain/usecases/model_recommendation_service.dart';
@@ -15,15 +15,45 @@ final hardwareProfileProvider = FutureProvider<HardwareProfile>((ref) {
   return ref.watch(hardwareDetectorProvider).detect();
 });
 
-/// Live snapshot of models the local Ollama server already has. This is the
-/// source of truth for "installed models" — no separate local registry is
-/// kept, so it can never drift out of sync with what Ollama actually has.
+/// Live snapshot of models installed on the active Ollama server. No
+/// separate local registry is kept, so this can never drift out of sync
+/// with reality.
 final installedModelsProvider = FutureProvider.autoDispose((ref) async {
   final repo = ref.watch(chatRepositoryProvider);
-  final engine = ref.watch(ollamaEngineProvider);
   final settings = await repo.getSettings();
-  return engine.listModels(baseUrl: settings.ollamaServerUrl);
+  return ref.watch(ollamaEngineProvider).listModels(baseUrl: settings.ollamaServerUrl);
 });
+
+class ModelActions {
+  ModelActions(this._ref);
+
+  final Ref _ref;
+
+  Future<String> _baseUrl() async {
+    final repo = _ref.read(chatRepositoryProvider);
+    final settings = await repo.getSettings();
+    return settings.ollamaServerUrl;
+  }
+
+  Future<void> deleteModel(String name) async {
+    final engine = _ref.read(ollamaEngineProvider);
+    final baseUrl = await _baseUrl();
+    await engine.deleteModel(baseUrl: baseUrl, model: name);
+    _ref.invalidate(installedModelsProvider);
+  }
+
+  Future<void> deleteAllModels() async {
+    final engine = _ref.read(ollamaEngineProvider);
+    final baseUrl = await _baseUrl();
+    final models = await engine.listModels(baseUrl: baseUrl);
+    for (final m in models) {
+      await engine.deleteModel(baseUrl: baseUrl, model: m.name);
+    }
+    _ref.invalidate(installedModelsProvider);
+  }
+}
+
+final modelActionsProvider = Provider<ModelActions>((ref) => ModelActions(ref));
 
 final huggingFaceSearchProvider =
     FutureProvider.autoDispose.family<List<HuggingFaceModelSummary>, String>((ref, query) async {
@@ -65,8 +95,10 @@ class DownloadState {
   }
 }
 
-/// Tracks in-flight HuggingFace/remote-URL downloads and, on completion,
-/// registers the resulting GGUF file with Ollama via `/api/create`.
+/// Tracks in-flight HuggingFace/remote-URL downloads. The GGUF file is
+/// staged in the shared local models directory just long enough to hash and
+/// upload it to the Ollama server via `/api/create`, then deleted — Ollama
+/// keeps its own copy once the model is registered.
 class DownloadManager extends Notifier<Map<String, DownloadState>> {
   @override
   Map<String, DownloadState> build() => {};
@@ -78,10 +110,9 @@ class DownloadManager extends Notifier<Map<String, DownloadState>> {
     required String modelName,
   }) async {
     final downloader = ref.read(modelDownloaderProvider);
-    final supportDir = await getApplicationSupportDirectory();
-    final modelsDir = Directory(p.join(supportDir.path, 'models'));
-    if (!await modelsDir.exists()) await modelsDir.create(recursive: true);
-    final destination = p.join(modelsDir.path, key.replaceAll(RegExp(r'[\\/]'), '_'));
+    final modelsDir = await getModelsDirectory();
+    final fileName = key.replaceAll(RegExp(r'[\\/]'), '_');
+    final destination = p.join(modelsDir.path, fileName);
 
     state = {...state, key: DownloadState(label: label, receivedBytes: 0)};
 
@@ -96,13 +127,17 @@ class DownloadManager extends Notifier<Map<String, DownloadState>> {
       }
 
       final repo = ref.read(chatRepositoryProvider);
-      final engine = ref.read(ollamaEngineProvider);
       final settings = await repo.getSettings();
+      final engine = ref.read(ollamaEngineProvider);
       await engine.createModelFromGguf(
         baseUrl: settings.ollamaServerUrl,
         modelName: modelName,
         ggufPath: destination,
       );
+
+      // The staged download is redundant once Ollama has its own copy.
+      final staged = File(destination);
+      if (await staged.exists()) await staged.delete();
 
       final finalState = state[key];
       if (finalState != null) {
@@ -113,6 +148,13 @@ class DownloadManager extends Notifier<Map<String, DownloadState>> {
       final current = state[key];
       if (current != null) {
         state = {...state, key: current.copyWith(error: e.toString())};
+      }
+      // Registration failed (e.g. Ollama rejected the GGUF) but the file was
+      // already fully downloaded — remove it rather than leaving a dead copy
+      // on disk, since retrying without a different file won't help.
+      final leftover = File(destination);
+      if (await leftover.exists()) {
+        await leftover.delete();
       }
     }
   }

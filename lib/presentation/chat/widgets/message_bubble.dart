@@ -6,9 +6,10 @@ import 'rich_content_view.dart';
 import 'streaming_indicator.dart';
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({super.key, required this.message});
+  const MessageBubble({super.key, required this.message, this.isModelWarm});
 
   final ChatMessage message;
+  final bool? isModelWarm;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +33,7 @@ class MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isEmptyStreaming)
-                  StreamingIndicator(since: message.createdAt)
+                  StreamingIndicator(since: message.createdAt, isModelWarm: isModelWarm)
                 else
                   RichContentView(content: message.content, textColor: textColor),
                 if (message.status == MessageStatus.error && message.errorMessage != null)
@@ -72,14 +73,24 @@ class MessageBubble extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       onPressed: message.content.isEmpty
                           ? null
-                          : () {
-                              Clipboard.setData(ClipboardData(text: message.content));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Copied to clipboard'),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
+                          : () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                await Clipboard.setData(ClipboardData(text: message.content));
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Copied to clipboard'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              } catch (_) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Copy failed'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              }
                             },
                     ),
                   ],

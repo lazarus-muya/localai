@@ -54,11 +54,18 @@ abstract class InferenceEngine {
 
   Future<List<EngineModelInfo>> listModels({required String baseUrl});
 
+  /// Whether [model] is currently resident in the server's memory, per its
+  /// running-models endpoint. Used to tell a genuine cold start apart from
+  /// an ordinary slow response so the UI doesn't misreport one as the other.
+  Future<bool> isModelLoaded({required String baseUrl, required String model});
+
   Future<void> pullModel({
     required String baseUrl,
     required String model,
     void Function(PullProgress progress)? onProgress,
   });
+
+  Future<void> deleteModel({required String baseUrl, required String model});
 
   Future<bool> testConnection({required String baseUrl});
 }

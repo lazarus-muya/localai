@@ -16,6 +16,8 @@ class HistoryActions {
       _ref.read(chatRepositoryProvider).renameConversation(id, title);
 
   Future<void> delete(String id) => _ref.read(chatRepositoryProvider).deleteConversation(id);
+
+  Future<void> deleteAll() => _ref.read(chatRepositoryProvider).deleteAllConversations();
 }
 
 final historyActionsProvider = Provider<HistoryActions>((ref) => HistoryActions(ref));
