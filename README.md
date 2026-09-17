@@ -180,3 +180,12 @@ flutter test
 
 This project is under active development (see git history for the current phase). Run
 `flutter analyze` and `flutter test` before opening a PR.
+
+## License
+
+Licensed under **AGPL-3.0 with the Commons Clause condition** — see [LICENSE](LICENSE).
+In short: the source is public, you're free to use, study, modify, and redistribute it
+(and any modified/hosted version must also publish its source), but **selling the
+software or its source code, or offering it as a paid product/service, is not
+permitted**. Contact the maintainer for a separate commercial license if you need rights
+beyond this.
