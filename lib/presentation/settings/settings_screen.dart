@@ -11,15 +11,30 @@ import '../../domain/entities/app_settings.dart';
 import '../models/model_library_controller.dart';
 import '../shared/widgets/settings_section.dart';
 
-/// Opaque id used to tag read-aloud test utterances so the Settings screen can
-/// tell (and stop) its own preview vs. something else speaking.
+/// Prefix used to tag read-aloud preview utterances so the Settings screen can
+/// tell (and stop) its own preview vs. something else speaking. Each voice
+/// gets its own suffixed key so the bottom sheet only highlights the tile
+/// that's actually playing.
 const _voicePreviewKey = '__voice_preview__';
+
+/// Per-voice preview key: distinct for every voice so the picker's tiles can
+/// tell which one is currently speaking.
+String _voicePreviewKeyFor(Map<String, String> voice) {
+  final key = _voiceKey(voice);
+  return key == null ? '$_voicePreviewKey|system' : '$_voicePreviewKey|$key';
+}
 
 /// Read aloud to preview a voice before applying it as the default.
 const _voiceSampleParagraph =
     'Hello! This is how my voice will sound when I read your messages aloud. '
     'Pick a voice, give it a listen, then save your settings to make it the '
     'default.';
+
+/// 'name|locale' key used to identify a voice entry across the picker UI.
+String? _voiceKey(Map<String, String> voice) {
+  if (voice.isEmpty) return null;
+  return '${voice['name']}|${voice['locale']}';
+}
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -128,6 +143,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   SettingsRow(
                     title: 'Server address',
                     subtitle: 'Base URL of your local Ollama server.',
+                    stackOnNarrow: true,
                     trailing: TextField(
                       controller: _baseUrlController,
                       textAlign: TextAlign.end,
@@ -136,6 +152,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   SettingsRow(
                     title: 'Port',
+                    stackOnNarrow: true,
                     trailing: TextField(
                       controller: _portController,
                       keyboardType: TextInputType.number,
@@ -146,6 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   SettingsRow(
                     title: 'Default model',
                     subtitle: 'Used for new chats unless overridden.',
+                    stackOnNarrow: true,
                     trailing: TextField(
                       controller: _ollamaModelController,
                       textAlign: TextAlign.end,
@@ -179,6 +197,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _testResult ??
                         'Verify LocalAi can reach the server above.',
                     isForSuccess: _testResult == 'Connected',
+                    stackOnNarrow: true,
                     trailing: OutlinedButton(
                       onPressed: _testing ? null : _testConnection,
                       child: _testing
@@ -195,6 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle:
                         'Minutes of inactivity before Ollama frees the model from '
                         'memory. Use 0 to keep it loaded forever.',
+                    stackOnNarrow: true,
                     trailing: TextField(
                       controller: _keepAliveController,
                       keyboardType: TextInputType.number,
@@ -228,6 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   SettingsRow(
                     title: 'Theme',
                     subtitle: 'Match your system, or pin light/dark.',
+                    stackOnNarrow: true,
                     trailing: const _ThemeModeSelector(),
                   ),
                 ],
@@ -240,17 +261,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle:
                         'Selected: $_pendingVoiceLabel. Pick a voice below to '
                         'preview it, then save to apply.',
+                    stackOnNarrow: true,
                     trailing: _VoiceDropdown(
                       selectedVoice: _pendingTtsVoice,
                       onChanged: (voice) =>
                           setState(() => _pendingTtsVoice = voice ?? const {}),
                     ),
                     trailingWidth: 240,
-                  ),
-                  SettingsBlockRow(
-                    title: 'Test voice',
-                    // subtitle: 'Hear the selected voice before applying it.',
-                    child: _VoiceTester(voice: _pendingTtsVoice),
                   ),
                 ],
               ),
@@ -408,11 +425,6 @@ class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
   /// 'system' selects the platform default; 'name|locale' selects a voice.
   final _selectedKey = ValueNotifier<String?>('system');
 
-  static String? _keyFor(Map<String, String> voice) {
-    if (voice.isEmpty) return null;
-    return '${voice['name']}|${voice['locale']}';
-  }
-
   @override
   void dispose() {
     _selectedKey.dispose();
@@ -424,7 +436,14 @@ class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
     final voicesAsync = ref.watch(ttsVoicesProvider);
     return voicesAsync.maybeWhen(
       data: (voices) {
-        _selectedKey.value = _keyFor(widget.selectedVoice) ?? 'system';
+        _selectedKey.value = _voiceKey(widget.selectedVoice) ?? 'system';
+        if (MediaQuery.sizeOf(context).width < AppBreakpoints.desktop) {
+          return _MobileVoicePicker(
+            voices: voices,
+            selectedVoice: widget.selectedVoice,
+            onChanged: widget.onChanged,
+          );
+        }
         return DropdownButtonHideUnderline(
           child: DropdownButton2<String>(
             isDense: true,
@@ -441,7 +460,7 @@ class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
               ),
               for (final voice in voices)
                 DropdownItem(
-                  value: _keyFor(voice) ?? '${voice.hashCode}',
+                  value: _voiceKey(voice) ?? '${voice.hashCode}',
                   child: Text(
                     (voice['name'] ?? 'Unknown voice').isNotEmpty
                         ? '${voice['name']} (${voice['locale'] ?? ''})'
@@ -457,7 +476,7 @@ class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
                 return;
               }
               final picked = voices.firstWhere(
-                (voice) => _keyFor(voice) == key,
+                (voice) => _voiceKey(voice) == key,
                 orElse: () => const {},
               );
               if (picked.isNotEmpty) widget.onChanged(picked);
@@ -487,52 +506,267 @@ class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
   }
 }
 
-class _VoiceTester extends ConsumerWidget {
-  const _VoiceTester({required this.voice});
+/// Mobile-optimized voice field: a tappable row that opens a modal bottom
+/// sheet listing every voice with a per-voice preview button on the leading
+/// edge and a "set as selected" control on the trailing edge. Wide layouts
+/// keep the plain [DropdownButton2] instead.
+class _MobileVoicePicker extends ConsumerWidget {
+  const _MobileVoicePicker({
+    required this.voices,
+    required this.selectedVoice,
+    required this.onChanged,
+  });
 
-  final Map<String, String> voice;
+  final List<Map<String, String>> voices;
+  final Map<String, String> selectedVoice;
+  final ValueChanged<Map<String, String>?> onChanged;
+
+  String get _label {
+    final name = selectedVoice['name'];
+    final locale = selectedVoice['locale'];
+    if (name == null || name.isEmpty) return 'System default';
+    return locale == null || locale.isEmpty ? name : '$name ($locale)';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final speech = ref.watch(speechControllerProvider);
-    final previewing = speech.isSpeaking && speech.speakingKey == _voicePreviewKey;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Text(
-        //   _voiceSampleParagraph,
-        //   style: TextStyle(
-        //     color: Theme.of(context).colorScheme.onSurface,
-        //     fontSize: 13,
-        //     fontStyle: FontStyle.italic,
-        //   ),
-        // ),
-        // const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: previewing
-              ? OutlinedButton.icon(
-                  onPressed: () =>
-                      ref.read(speechControllerProvider.notifier).stop(),
-                  icon: const Icon(Icons.stop, size: 16),
-                  label: const Text('Stop'),
-                )
-              : FilledButton.tonalIcon(
-                  onPressed: () {
-                    // Pass the map as-is (even when empty) so switching the
-                    // picker to "System default" previews the true platform
-                    // voice rather than a previously saved default.
-                    ref.read(speechControllerProvider.notifier).speak(
-                          _voiceSampleParagraph,
-                          key: _voicePreviewKey,
-                          voice: voice,
-                        );
-                  },
-                  icon: const Icon(Icons.volume_up, size: 16),
-                  label: const Text('Test voice'),
-                ),
+    final palette = context.palette;
+    return Material(
+      color: palette.inputFill,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          backgroundColor: palette.cardBackground,
+          builder: (_) => _VoicePickerSheet(
+            voices: voices,
+            selectedVoice: selectedVoice,
+            onChanged: onChanged,
+          ),
         ),
-      ],
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: palette.cardBorder),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: palette.textPrimary, fontSize: 13.5),
+                ),
+              ),
+              Icon(Icons.expand_more, size: 18, color: palette.mutedText),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoicePickerSheet extends ConsumerStatefulWidget {
+  const _VoicePickerSheet({
+    required this.voices,
+    required this.selectedVoice,
+    required this.onChanged,
+  });
+
+  final List<Map<String, String>> voices;
+  final Map<String, String> selectedVoice;
+  final ValueChanged<Map<String, String>?> onChanged;
+
+  @override
+  ConsumerState<_VoicePickerSheet> createState() => _VoicePickerSheetState();
+}
+
+class _VoicePickerSheetState extends ConsumerState<_VoicePickerSheet> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  static bool _voiceMatches(Map<String, String> voice, String query) {
+    final name = (voice['name'] ?? '').toLowerCase();
+    final locale = (voice['locale'] ?? '').toLowerCase();
+    return name.contains(query) || locale.contains(query);
+  }
+
+  List<Map<String, String>> get _filteredVoices {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return widget.voices;
+    return [
+      for (final voice in widget.voices)
+        if (_voiceMatches(voice, query)) voice,
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final filtered = _filteredVoices;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 2, 20, 4),
+              child: Text(
+                'Choose a voice',
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Tap the speaker to preview a voice, then use the check on the '
+                'right to set it as the default.',
+                style: TextStyle(color: palette.mutedText, fontSize: 12.5),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search voices',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        ),
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 8),
+                children: [
+                  Divider(height: 1, color: palette.divider),
+                  _VoiceSheetTile(
+                    voice: const {},
+                    previewKey: _voicePreviewKeyFor(const {}),
+                    isSystem: true,
+                    selected: widget.selectedVoice.isEmpty,
+                    onSelect: () => widget.onChanged(null),
+                  ),
+                  if (filtered.isNotEmpty) ...[
+                    Divider(height: 1, color: palette.divider),
+                    for (var i = 0; i < filtered.length; i++) ...[
+                      _VoiceSheetTile(
+                        voice: filtered[i],
+                        previewKey: _voicePreviewKeyFor(filtered[i]),
+                        isSystem: false,
+                        selected: _voiceKey(widget.selectedVoice) ==
+                            _voiceKey(filtered[i]),
+                        onSelect: () => widget.onChanged(filtered[i]),
+                      ),
+                      if (i < filtered.length - 1)
+                        Divider(height: 1, color: palette.divider),
+                    ],
+                  ] else if (widget.voices.isNotEmpty) ...[
+                    Divider(height: 1, color: palette.divider),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                      child: Text(
+                        'No voices match “${_searchController.text.trim()}”.',
+                        style: TextStyle(
+                          color: palette.mutedText,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceSheetTile extends ConsumerWidget {
+  const _VoiceSheetTile({
+    required this.voice,
+    required this.previewKey,
+    required this.isSystem,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final Map<String, String> voice;
+  final String previewKey;
+  final bool isSystem;
+  final bool selected;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.palette;
+    final speech = ref.watch(speechControllerProvider);
+    final locale = voice['locale']?.trim() ?? '';
+    final previewing = speech.isSpeaking && speech.speakingKey == previewKey;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: IconButton(
+        onPressed: previewing
+            ? () => ref.read(speechControllerProvider.notifier).stop()
+            : () => ref
+                  .read(speechControllerProvider.notifier)
+                  .speak(_voiceSampleParagraph, key: previewKey, voice: voice),
+        icon: Icon(previewing ? Icons.stop : Icons.volume_up, size: 20),
+        color: previewing ? palette.accent : palette.mutedText,
+        tooltip: previewing ? 'Stop preview' : 'Test voice',
+      ),
+      title: Text(
+        isSystem ? 'System default' : (voice['name'] ?? 'Unknown voice'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: isSystem
+          ? const Text('Let the device pick the voice')
+          : (locale.isEmpty ? null : Text(locale)),
+      trailing: IconButton(
+        onPressed: () {
+          onSelect();
+          Navigator.of(context).pop();
+        },
+        icon: Icon(
+          selected ? Icons.check_circle : Icons.check_circle_outline,
+          size: 22,
+        ),
+        color: selected ? palette.accent : palette.mutedText,
+        tooltip: selected ? 'Currently selected' : 'Set as selected voice',
+      ),
     );
   }
 }

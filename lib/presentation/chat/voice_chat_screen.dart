@@ -29,6 +29,19 @@ class _VoiceChatScreenState extends ConsumerState<VoiceChatScreen> {
   }
 
   @override
+  void dispose() {
+    // Leaving the overlay always exits voice mode: stop reading anything
+    // aloud, stop listening and cancel whatever reply is still generating.
+    ref.read(voiceChatControllerProvider(widget.conversationId).notifier).shutdown();
+    super.dispose();
+  }
+
+  void _close() {
+    ref.read(voiceChatControllerProvider(widget.conversationId).notifier).shutdown();
+    Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(voiceChatControllerProvider(widget.conversationId));
 
@@ -56,7 +69,7 @@ class _VoiceChatScreenState extends ConsumerState<VoiceChatScreen> {
                   child: IconButton(
                     tooltip: 'Close voice chat',
                     icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _close,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -85,6 +98,28 @@ class _VoiceChatScreenState extends ConsumerState<VoiceChatScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (state.phase == VoiceChatPhase.thinking ||
+                    state.phase == VoiceChatPhase.speaking)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child: OutlinedButton.icon(
+                      onPressed: () => ref
+                          .read(
+                            voiceChatControllerProvider(widget.conversationId)
+                                .notifier,
+                          )
+                          .interrupt(),
+                      icon: const Icon(Icons.stop, size: 17),
+                      label: const Text('Interrupt'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white38),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (state.transcript.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),

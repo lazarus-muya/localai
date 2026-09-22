@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/adaptive/breakpoints.dart';
 import '../../../core/theme/app_palette.dart';
 
 /// A labeled group of related settings, rendered as a small caps heading
@@ -54,6 +55,8 @@ class SettingsSection extends StatelessWidget {
 
 /// A single row inside a [SettingsSection]: a title/subtitle on the left and
 /// an arbitrary trailing control on the right (switch, dropdown, button…).
+/// When [stackOnNarrow] is true, narrow (phone) widths stack the label above
+/// the full-width control instead so nothing overflows.
 class SettingsRow extends StatelessWidget {
   const SettingsRow({
     super.key,
@@ -62,6 +65,7 @@ class SettingsRow extends StatelessWidget {
     this.trailing,
     this.trailingWidth,
     this.isForSuccess = false,
+    this.stackOnNarrow = false,
   });
 
   final String title;
@@ -69,47 +73,69 @@ class SettingsRow extends StatelessWidget {
   final Widget? trailing;
   final double? trailingWidth;
   final bool isForSuccess;
+  final bool stackOnNarrow;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final narrow =
+        stackOnNarrow &&
+        MediaQuery.sizeOf(context).width < AppBreakpoints.desktop;
+    final label = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: palette.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: TextStyle(
+              color: isForSuccess ? palette.success : palette.mutedText,
+              fontSize: 12.5,
+            ),
+          ),
+        ],
+      ],
+    );
+    final control = trailing == null
+        ? null
+        : narrow
+              ? SizedBox(width: double.infinity, child: trailing)
+              : trailingWidth != null
+                    ? SizedBox(width: trailingWidth, child: trailing)
+                    : trailing;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
+      child: narrow
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(color: isForSuccess ? palette.success : palette.mutedText, fontSize: 12.5),
-                  ),
+                label,
+                if (control != null) ...[
+                  const SizedBox(height: 12),
+                  control,
+                ],
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: label),
+                if (control != null) ...[
+                  const SizedBox(width: 16),
+                  control,
                 ],
               ],
             ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: 16),
-            if (trailingWidth != null)
-              SizedBox(width: trailingWidth, child: trailing)
-            else
-              trailing!,
-          ],
-        ],
-      ),
     );
   }
 }

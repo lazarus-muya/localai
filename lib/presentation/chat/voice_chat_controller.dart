@@ -64,6 +64,7 @@ class VoiceChatController extends Notifier<VoiceChatState> {
   final List<String> _ttsQueue = [];
   bool _ttsWorking = false;
   bool _errorIsPermanent = false;
+  bool _interrupted = false;
 
   @override
   VoiceChatState build() {
@@ -77,6 +78,7 @@ class VoiceChatController extends Notifier<VoiceChatState> {
   }
 
   Future<void> start() async {
+    _interrupted = false;
     final speech = ref.read(speechRecognitionProvider);
     final available = await speech.initialize(
       onTranscript: _onTranscript,
@@ -128,6 +130,7 @@ class VoiceChatController extends Notifier<VoiceChatState> {
   }
 
   Future<void> _submit(String utterance) async {
+    _interrupted = false;
     state = state.copyWith(phase: VoiceChatPhase.thinking, transcript: '');
     String? newId;
     try {
@@ -166,6 +169,7 @@ class VoiceChatController extends Notifier<VoiceChatState> {
   }
 
   void _onAssistantContent() {
+    if (_interrupted) return;
     final message = _lastAssistant!;
     if (message.status == MessageStatus.error || message.status == MessageStatus.cancelled) {
       unawaited(_finalizeWhenQuiet());
@@ -215,6 +219,47 @@ class VoiceChatController extends Notifier<VoiceChatState> {
       return;
     }
     await _beginListening();
+  }
+
+  /// Cancels whatever the model is still producing, drops queued and in-flight
+  /// speech, and returns the session straight to listening so the user can
+  /// talk over the reply (Gemini-style interrupt).
+  Future<void> interrupt() async {
+    _interrupted = true;
+    _ttsQueue.clear();
+    _ttsWorking = false;
+    _spokenMessageId = null;
+    _spokenChars = 0;
+    ref.read(chatControllerProvider(_activeId).notifier).cancel();
+    ref.read(speechControllerProvider.notifier).stop();
+    final speech = ref.read(speechRecognitionProvider);
+    await speech.cancel();
+    if (state.phase != VoiceChatPhase.unsupported) {
+      state = state.copyWith(
+        phase: VoiceChatPhase.listening,
+        transcript: '',
+        micLevel: 0,
+      );
+    }
+    await _beginListening();
+  }
+
+  /// Tears the session down completely: stops recognition, reading aloud and
+  /// any in-flight reply, then resets state so entering the voice screen
+  /// again starts from a clean slate. Used when the overlay is dismissed.
+  Future<void> shutdown() async {
+    _interrupted = true;
+    _ttsQueue.clear();
+    _ttsWorking = false;
+    _spokenMessageId = null;
+    _spokenChars = 0;
+    _lastAssistant = null;
+    _messagesSub?.cancel();
+    _messagesSub = null;
+    ref.read(chatControllerProvider(_activeId).notifier).cancel();
+    ref.read(speechControllerProvider.notifier).stop();
+    await ref.read(speechRecognitionProvider).cancel();
+    state = VoiceChatState(activeConversationId: initialConversationId);
   }
 }
 

@@ -109,6 +109,13 @@ class AppTheme {
           side: BorderSide(color: p.cardBorder),
         ),
       ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: p.cardBackground,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+      ),
       popupMenuTheme: PopupMenuThemeData(
         color: p.cardBackground,
         surfaceTintColor: Colors.transparent,
