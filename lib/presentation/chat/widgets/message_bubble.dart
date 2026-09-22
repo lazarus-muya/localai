@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/speech/text_to_speech.dart';
 import '../../../domain/entities/message.dart';
 import 'rich_content_view.dart';
 import 'streaming_indicator.dart';
 
-class MessageBubble extends StatelessWidget {
+class MessageBubble extends ConsumerWidget {
   const MessageBubble({super.key, required this.message, this.isModelWarm});
 
   final ChatMessage message;
   final bool? isModelWarm;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == ChatRole.user;
     final colorScheme = Theme.of(context).colorScheme;
     final bubbleColor = isUser ? colorScheme.primaryContainer : colorScheme.surfaceContainerHigh;
     final textColor = isUser ? colorScheme.onPrimaryContainer : colorScheme.onSurface;
     final isEmptyStreaming = message.content.isEmpty && message.status == MessageStatus.streaming;
+
+    final speech = ref.watch(speechControllerProvider);
+    final isSpeakingThis = speech.isSpeaking && speech.speakingKey == message.id;
+    final canRead = message.content.trim().isNotEmpty;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -67,6 +73,23 @@ class MessageBubble extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     const Spacer(),
+                    if (!isUser && canRead)
+                      IconButton(
+                        icon: Icon(
+                          isSpeakingThis ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
+                          size: 16,
+                        ),
+                        tooltip: isSpeakingThis ? 'Stop reading' : 'Read aloud',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          final notifier = ref.read(speechControllerProvider.notifier);
+                          if (isSpeakingThis) {
+                            notifier.stop();
+                          } else {
+                            notifier.speak(message.content, key: message.id);
+                          }
+                        },
+                      ),
                     IconButton(
                       icon: const Icon(Icons.copy, size: 16),
                       tooltip: 'Copy',

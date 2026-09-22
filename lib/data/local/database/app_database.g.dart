@@ -1199,6 +1199,17 @@ class $AppSettingsTableTable extends AppSettingsTable
     requiredDuringInsert: false,
     defaultValue: const Constant(20),
   );
+  static const VerificationMeta _defaultTtsVoiceMeta = const VerificationMeta(
+    'defaultTtsVoice',
+  );
+  @override
+  late final GeneratedColumn<String> defaultTtsVoice = GeneratedColumn<String>(
+    'default_tts_voice',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1207,6 +1218,7 @@ class $AppSettingsTableTable extends AppSettingsTable
     globalSystemPrompt,
     defaultOllamaModel,
     modelKeepAliveMinutes,
+    defaultTtsVoice,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1265,6 +1277,15 @@ class $AppSettingsTableTable extends AppSettingsTable
         ),
       );
     }
+    if (data.containsKey('default_tts_voice')) {
+      context.handle(
+        _defaultTtsVoiceMeta,
+        defaultTtsVoice.isAcceptableOrUnknown(
+          data['default_tts_voice']!,
+          _defaultTtsVoiceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1298,6 +1319,10 @@ class $AppSettingsTableTable extends AppSettingsTable
         DriftSqlType.int,
         data['${effectivePrefix}model_keep_alive_minutes'],
       )!,
+      defaultTtsVoice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_tts_voice'],
+      ),
     );
   }
 
@@ -1314,6 +1339,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
   final String? globalSystemPrompt;
   final String? defaultOllamaModel;
   final int modelKeepAliveMinutes;
+  final String? defaultTtsVoice;
   const SettingsRow({
     required this.id,
     required this.ollamaBaseUrl,
@@ -1321,6 +1347,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     this.globalSystemPrompt,
     this.defaultOllamaModel,
     required this.modelKeepAliveMinutes,
+    this.defaultTtsVoice,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1335,6 +1362,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       map['default_ollama_model'] = Variable<String>(defaultOllamaModel);
     }
     map['model_keep_alive_minutes'] = Variable<int>(modelKeepAliveMinutes);
+    if (!nullToAbsent || defaultTtsVoice != null) {
+      map['default_tts_voice'] = Variable<String>(defaultTtsVoice);
+    }
     return map;
   }
 
@@ -1350,6 +1380,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           ? const Value.absent()
           : Value(defaultOllamaModel),
       modelKeepAliveMinutes: Value(modelKeepAliveMinutes),
+      defaultTtsVoice: defaultTtsVoice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultTtsVoice),
     );
   }
 
@@ -1371,6 +1404,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       modelKeepAliveMinutes: serializer.fromJson<int>(
         json['modelKeepAliveMinutes'],
       ),
+      defaultTtsVoice: serializer.fromJson<String?>(json['defaultTtsVoice']),
     );
   }
   @override
@@ -1383,6 +1417,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       'globalSystemPrompt': serializer.toJson<String?>(globalSystemPrompt),
       'defaultOllamaModel': serializer.toJson<String?>(defaultOllamaModel),
       'modelKeepAliveMinutes': serializer.toJson<int>(modelKeepAliveMinutes),
+      'defaultTtsVoice': serializer.toJson<String?>(defaultTtsVoice),
     };
   }
 
@@ -1393,6 +1428,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     Value<String?> globalSystemPrompt = const Value.absent(),
     Value<String?> defaultOllamaModel = const Value.absent(),
     int? modelKeepAliveMinutes,
+    Value<String?> defaultTtsVoice = const Value.absent(),
   }) => SettingsRow(
     id: id ?? this.id,
     ollamaBaseUrl: ollamaBaseUrl ?? this.ollamaBaseUrl,
@@ -1404,6 +1440,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
         ? defaultOllamaModel.value
         : this.defaultOllamaModel,
     modelKeepAliveMinutes: modelKeepAliveMinutes ?? this.modelKeepAliveMinutes,
+    defaultTtsVoice: defaultTtsVoice.present
+        ? defaultTtsVoice.value
+        : this.defaultTtsVoice,
   );
   SettingsRow copyWithCompanion(AppSettingsTableCompanion data) {
     return SettingsRow(
@@ -1423,6 +1462,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       modelKeepAliveMinutes: data.modelKeepAliveMinutes.present
           ? data.modelKeepAliveMinutes.value
           : this.modelKeepAliveMinutes,
+      defaultTtsVoice: data.defaultTtsVoice.present
+          ? data.defaultTtsVoice.value
+          : this.defaultTtsVoice,
     );
   }
 
@@ -1434,7 +1476,8 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           ..write('ollamaPort: $ollamaPort, ')
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
           ..write('defaultOllamaModel: $defaultOllamaModel, ')
-          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes')
+          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes, ')
+          ..write('defaultTtsVoice: $defaultTtsVoice')
           ..write(')'))
         .toString();
   }
@@ -1447,6 +1490,7 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     globalSystemPrompt,
     defaultOllamaModel,
     modelKeepAliveMinutes,
+    defaultTtsVoice,
   );
   @override
   bool operator ==(Object other) =>
@@ -1457,7 +1501,8 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           other.ollamaPort == this.ollamaPort &&
           other.globalSystemPrompt == this.globalSystemPrompt &&
           other.defaultOllamaModel == this.defaultOllamaModel &&
-          other.modelKeepAliveMinutes == this.modelKeepAliveMinutes);
+          other.modelKeepAliveMinutes == this.modelKeepAliveMinutes &&
+          other.defaultTtsVoice == this.defaultTtsVoice);
 }
 
 class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
@@ -1467,6 +1512,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
   final Value<String?> globalSystemPrompt;
   final Value<String?> defaultOllamaModel;
   final Value<int> modelKeepAliveMinutes;
+  final Value<String?> defaultTtsVoice;
   const AppSettingsTableCompanion({
     this.id = const Value.absent(),
     this.ollamaBaseUrl = const Value.absent(),
@@ -1474,6 +1520,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     this.globalSystemPrompt = const Value.absent(),
     this.defaultOllamaModel = const Value.absent(),
     this.modelKeepAliveMinutes = const Value.absent(),
+    this.defaultTtsVoice = const Value.absent(),
   });
   AppSettingsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -1482,6 +1529,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     this.globalSystemPrompt = const Value.absent(),
     this.defaultOllamaModel = const Value.absent(),
     this.modelKeepAliveMinutes = const Value.absent(),
+    this.defaultTtsVoice = const Value.absent(),
   });
   static Insertable<SettingsRow> custom({
     Expression<int>? id,
@@ -1490,6 +1538,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Expression<String>? globalSystemPrompt,
     Expression<String>? defaultOllamaModel,
     Expression<int>? modelKeepAliveMinutes,
+    Expression<String>? defaultTtsVoice,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1501,6 +1550,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
         'default_ollama_model': defaultOllamaModel,
       if (modelKeepAliveMinutes != null)
         'model_keep_alive_minutes': modelKeepAliveMinutes,
+      if (defaultTtsVoice != null) 'default_tts_voice': defaultTtsVoice,
     });
   }
 
@@ -1511,6 +1561,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Value<String?>? globalSystemPrompt,
     Value<String?>? defaultOllamaModel,
     Value<int>? modelKeepAliveMinutes,
+    Value<String?>? defaultTtsVoice,
   }) {
     return AppSettingsTableCompanion(
       id: id ?? this.id,
@@ -1520,6 +1571,7 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
       defaultOllamaModel: defaultOllamaModel ?? this.defaultOllamaModel,
       modelKeepAliveMinutes:
           modelKeepAliveMinutes ?? this.modelKeepAliveMinutes,
+      defaultTtsVoice: defaultTtsVoice ?? this.defaultTtsVoice,
     );
   }
 
@@ -1546,6 +1598,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
         modelKeepAliveMinutes.value,
       );
     }
+    if (defaultTtsVoice.present) {
+      map['default_tts_voice'] = Variable<String>(defaultTtsVoice.value);
+    }
     return map;
   }
 
@@ -1557,7 +1612,8 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
           ..write('ollamaPort: $ollamaPort, ')
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
           ..write('defaultOllamaModel: $defaultOllamaModel, ')
-          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes')
+          ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes, ')
+          ..write('defaultTtsVoice: $defaultTtsVoice')
           ..write(')'))
         .toString();
   }
@@ -2367,6 +2423,7 @@ typedef $$AppSettingsTableTableCreateCompanionBuilder =
       Value<String?> globalSystemPrompt,
       Value<String?> defaultOllamaModel,
       Value<int> modelKeepAliveMinutes,
+      Value<String?> defaultTtsVoice,
     });
 typedef $$AppSettingsTableTableUpdateCompanionBuilder =
     AppSettingsTableCompanion Function({
@@ -2376,6 +2433,7 @@ typedef $$AppSettingsTableTableUpdateCompanionBuilder =
       Value<String?> globalSystemPrompt,
       Value<String?> defaultOllamaModel,
       Value<int> modelKeepAliveMinutes,
+      Value<String?> defaultTtsVoice,
     });
 
 class $$AppSettingsTableTableFilterComposer
@@ -2414,6 +2472,11 @@ class $$AppSettingsTableTableFilterComposer
 
   ColumnFilters<int> get modelKeepAliveMinutes => $composableBuilder(
     column: $table.modelKeepAliveMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultTtsVoice => $composableBuilder(
+    column: $table.defaultTtsVoice,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2456,6 +2519,11 @@ class $$AppSettingsTableTableOrderingComposer
     column: $table.modelKeepAliveMinutes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get defaultTtsVoice => $composableBuilder(
+    column: $table.defaultTtsVoice,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableTableAnnotationComposer
@@ -2492,6 +2560,11 @@ class $$AppSettingsTableTableAnnotationComposer
 
   GeneratedColumn<int> get modelKeepAliveMinutes => $composableBuilder(
     column: $table.modelKeepAliveMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultTtsVoice => $composableBuilder(
+    column: $table.defaultTtsVoice,
     builder: (column) => column,
   );
 }
@@ -2535,6 +2608,7 @@ class $$AppSettingsTableTableTableManager
                 Value<String?> globalSystemPrompt = const Value.absent(),
                 Value<String?> defaultOllamaModel = const Value.absent(),
                 Value<int> modelKeepAliveMinutes = const Value.absent(),
+                Value<String?> defaultTtsVoice = const Value.absent(),
               }) => AppSettingsTableCompanion(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
@@ -2542,6 +2616,7 @@ class $$AppSettingsTableTableTableManager
                 globalSystemPrompt: globalSystemPrompt,
                 defaultOllamaModel: defaultOllamaModel,
                 modelKeepAliveMinutes: modelKeepAliveMinutes,
+                defaultTtsVoice: defaultTtsVoice,
               ),
           createCompanionCallback:
               ({
@@ -2551,6 +2626,7 @@ class $$AppSettingsTableTableTableManager
                 Value<String?> globalSystemPrompt = const Value.absent(),
                 Value<String?> defaultOllamaModel = const Value.absent(),
                 Value<int> modelKeepAliveMinutes = const Value.absent(),
+                Value<String?> defaultTtsVoice = const Value.absent(),
               }) => AppSettingsTableCompanion.insert(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
@@ -2558,6 +2634,7 @@ class $$AppSettingsTableTableTableManager
                 globalSystemPrompt: globalSystemPrompt,
                 defaultOllamaModel: defaultOllamaModel,
                 modelKeepAliveMinutes: modelKeepAliveMinutes,
+                defaultTtsVoice: defaultTtsVoice,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

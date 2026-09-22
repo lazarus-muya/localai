@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -43,7 +45,19 @@ class ChatRepositoryImpl implements ChatRepository {
         globalSystemPrompt: row.globalSystemPrompt,
         defaultOllamaModel: row.defaultOllamaModel,
         modelKeepAliveMinutes: row.modelKeepAliveMinutes,
+        ttsVoice: _decodeVoice(row.defaultTtsVoice),
       );
+
+  Map<String, String>? _decodeVoice(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> || decoded.isEmpty) return null;
+      return decoded.map((key, value) => MapEntry(key, value.toString()));
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Stream<List<Conversation>> watchConversations() {
@@ -141,6 +155,11 @@ class ChatRepositoryImpl implements ChatRepository {
       globalSystemPrompt: Value(settings.globalSystemPrompt),
       defaultOllamaModel: Value(settings.defaultOllamaModel),
       modelKeepAliveMinutes: Value(settings.modelKeepAliveMinutes),
+      defaultTtsVoice: Value(
+        settings.ttsVoice == null || settings.ttsVoice!.isEmpty
+            ? null
+            : jsonEncode(settings.ttsVoice),
+      ),
     ));
   }
 }

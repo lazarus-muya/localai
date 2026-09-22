@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'chat_controller.dart';
+import 'voice_chat_screen.dart';
 import 'widgets/chat_input_bar.dart';
 import 'widgets/message_bubble.dart';
 
@@ -49,6 +50,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _openVoiceChat() {
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: false,
+        barrierColor: Colors.transparent,
+        transitionDuration: const Duration(milliseconds: 220),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (_, _, _) =>
+            VoiceChatScreen(conversationId: widget.conversationId),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversationId = widget.conversationId;
@@ -65,10 +82,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: const Text('Chat'),
         actions: [
-          IconButton(icon: const Icon(Icons.keyboard_voice), onPressed: () {}),
           IconButton(
-            icon: const Icon(Icons.speaker_phone_rounded),
-            onPressed: () {},
+            tooltip: 'Voice chat',
+            icon: const Icon(Icons.keyboard_voice),
+            onPressed: _openVoiceChat,
           ),
         ],
       ),

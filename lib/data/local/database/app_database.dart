@@ -44,6 +44,7 @@ class AppSettingsTable extends Table {
   TextColumn get globalSystemPrompt => text().nullable()();
   TextColumn get defaultOllamaModel => text().nullable()();
   IntColumn get modelKeepAliveMinutes => integer().withDefault(const Constant(20))();
+  TextColumn get defaultTtsVoice => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -54,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'localai_db'));
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -75,6 +76,9 @@ class AppDatabase extends _$AppDatabase {
               await m.dropColumn(appSettingsTable, 'engine_mode');
               await m.dropColumn(appSettingsTable, 'default_local_model');
             }
+          }
+          if (from < 6) {
+            await m.addColumn(appSettingsTable, appSettingsTable.defaultTtsVoice);
           }
         },
       );

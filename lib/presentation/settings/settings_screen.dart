@@ -4,11 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/adaptive/breakpoints.dart';
 import '../../core/di/providers.dart';
+import '../../core/speech/text_to_speech.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/theme/theme_mode_controller.dart';
 import '../../domain/entities/app_settings.dart';
 import '../models/model_library_controller.dart';
 import '../shared/widgets/settings_section.dart';
+
+/// Opaque id used to tag read-aloud test utterances so the Settings screen can
+/// tell (and stop) its own preview vs. something else speaking.
+const _voicePreviewKey = '__voice_preview__';
+
+/// Read aloud to preview a voice before applying it as the default.
+const _voiceSampleParagraph =
+    'Hello! This is how my voice will sound when I read your messages aloud. '
+    'Pick a voice, give it a listen, then save your settings to make it the '
+    'default.';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -23,6 +34,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _ollamaModelController = TextEditingController();
   final _systemPromptController = TextEditingController();
   final _keepAliveController = TextEditingController();
+
+  /// Voice chosen in the picker but not yet saved. Empty means "system
+  /// default" (explicitly clear any previously saved voice on save).
+  Map<String, String> _pendingTtsVoice = const {};
+
   bool _initialized = false;
   bool _testing = false;
   String? _testResult;
@@ -45,23 +61,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _ollamaModelController.text = settings.defaultOllamaModel ?? '';
     _systemPromptController.text = settings.globalSystemPrompt ?? '';
     _keepAliveController.text = settings.modelKeepAliveMinutes.toString();
+    _pendingTtsVoice = settings.ttsVoice ?? const {};
+  }
+
+  String get _pendingVoiceLabel {
+    final name = _pendingTtsVoice['name'];
+    final locale = _pendingTtsVoice['locale'];
+    if (name == null || name.isEmpty) return 'System default';
+    return locale == null || locale.isEmpty ? name : '$name ($locale)';
   }
 
   Future<void> _save() async {
     final repo = ref.read(chatRepositoryProvider);
     final current = await repo.getSettings();
-    await repo.updateSettings(
-      current.copyWith(
-        ollamaBaseUrl: _baseUrlController.text.trim(),
-        ollamaPort:
-            int.tryParse(_portController.text.trim()) ?? current.ollamaPort,
-        defaultOllamaModel: _ollamaModelController.text.trim(),
-        globalSystemPrompt: _systemPromptController.text,
-        modelKeepAliveMinutes:
-            int.tryParse(_keepAliveController.text.trim()) ??
-            current.modelKeepAliveMinutes,
-      ),
+    final updated = AppSettings(
+      ollamaBaseUrl: _baseUrlController.text.trim(),
+      ollamaPort:
+          int.tryParse(_portController.text.trim()) ?? current.ollamaPort,
+      globalSystemPrompt: _systemPromptController.text,
+      defaultOllamaModel: _ollamaModelController.text.trim(),
+      modelKeepAliveMinutes:
+          int.tryParse(_keepAliveController.text.trim()) ??
+          current.modelKeepAliveMinutes,
+      ttsVoice: _pendingTtsVoice.isEmpty ? null : _pendingTtsVoice,
     );
+    await repo.updateSettings(updated);
     ref.invalidate(installedModelsProvider);
     if (mounted) {
       ScaffoldMessenger.of(
@@ -208,6 +232,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
+              SettingsSection(
+                title: 'Voice settings',
+                children: [
+                  SettingsRow(
+                    title: 'Default voice',
+                    subtitle:
+                        'Selected: $_pendingVoiceLabel. Pick a voice below to '
+                        'preview it, then save to apply.',
+                    trailing: _VoiceDropdown(
+                      selectedVoice: _pendingTtsVoice,
+                      onChanged: (voice) =>
+                          setState(() => _pendingTtsVoice = voice ?? const {}),
+                    ),
+                    trailingWidth: 240,
+                  ),
+                  SettingsBlockRow(
+                    title: 'Test voice',
+                    // subtitle: 'Hear the selected voice before applying it.',
+                    child: _VoiceTester(voice: _pendingTtsVoice),
+                  ),
+                ],
+              ),
               const SizedBox(height: 4),
               Builder(
                 builder: (context) {
@@ -344,6 +390,149 @@ class _ThemeModeSelector extends ConsumerWidget {
             .read(themeModeControllerProvider.notifier)
             .setThemeMode(selection.first);
       },
+    );
+  }
+}
+
+class _VoiceDropdown extends ConsumerStatefulWidget {
+  const _VoiceDropdown({required this.selectedVoice, required this.onChanged});
+
+  final Map<String, String> selectedVoice;
+  final ValueChanged<Map<String, String>?> onChanged;
+
+  @override
+  ConsumerState<_VoiceDropdown> createState() => _VoiceDropdownState();
+}
+
+class _VoiceDropdownState extends ConsumerState<_VoiceDropdown> {
+  /// 'system' selects the platform default; 'name|locale' selects a voice.
+  final _selectedKey = ValueNotifier<String?>('system');
+
+  static String? _keyFor(Map<String, String> voice) {
+    if (voice.isEmpty) return null;
+    return '${voice['name']}|${voice['locale']}';
+  }
+
+  @override
+  void dispose() {
+    _selectedKey.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final voicesAsync = ref.watch(ttsVoicesProvider);
+    return voicesAsync.maybeWhen(
+      data: (voices) {
+        _selectedKey.value = _keyFor(widget.selectedVoice) ?? 'system';
+        return DropdownButtonHideUnderline(
+          child: DropdownButton2<String>(
+            isDense: true,
+            isExpanded: true,
+            valueListenable: _selectedKey,
+            hint: const Text(
+              'System default',
+              overflow: TextOverflow.ellipsis,
+            ),
+            items: [
+              DropdownItem(
+                value: 'system',
+                child: const Text('System default', overflow: TextOverflow.ellipsis),
+              ),
+              for (final voice in voices)
+                DropdownItem(
+                  value: _keyFor(voice) ?? '${voice.hashCode}',
+                  child: Text(
+                    (voice['name'] ?? 'Unknown voice').isNotEmpty
+                        ? '${voice['name']} (${voice['locale'] ?? ''})'
+                        : 'Unknown voice',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (key) {
+              if (key == null) return;
+              if (key == 'system') {
+                widget.onChanged(null);
+                return;
+              }
+              final picked = voices.firstWhere(
+                (voice) => _keyFor(voice) == key,
+                orElse: () => const {},
+              );
+              if (picked.isNotEmpty) widget.onChanged(picked);
+            },
+            buttonStyleData: const ButtonStyleData(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              height: 40,
+            ),
+            dropdownStyleData: DropdownStyleData(
+              maxHeight: 300,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const Text(
+        'Loading voices…',
+        style: TextStyle(fontSize: 12.5),
+      ),
+      orElse: () => const Text(
+        'No selectable voices on this device.',
+        style: TextStyle(fontSize: 12.5),
+      ),
+    );
+  }
+}
+
+class _VoiceTester extends ConsumerWidget {
+  const _VoiceTester({required this.voice});
+
+  final Map<String, String> voice;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final speech = ref.watch(speechControllerProvider);
+    final previewing = speech.isSpeaking && speech.speakingKey == _voicePreviewKey;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Text(
+        //   _voiceSampleParagraph,
+        //   style: TextStyle(
+        //     color: Theme.of(context).colorScheme.onSurface,
+        //     fontSize: 13,
+        //     fontStyle: FontStyle.italic,
+        //   ),
+        // ),
+        // const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: previewing
+              ? OutlinedButton.icon(
+                  onPressed: () =>
+                      ref.read(speechControllerProvider.notifier).stop(),
+                  icon: const Icon(Icons.stop, size: 16),
+                  label: const Text('Stop'),
+                )
+              : FilledButton.tonalIcon(
+                  onPressed: () {
+                    // Pass the map as-is (even when empty) so switching the
+                    // picker to "System default" previews the true platform
+                    // voice rather than a previously saved default.
+                    ref.read(speechControllerProvider.notifier).speak(
+                          _voiceSampleParagraph,
+                          key: _voicePreviewKey,
+                          voice: voice,
+                        );
+                  },
+                  icon: const Icon(Icons.volume_up, size: 16),
+                  label: const Text('Test voice'),
+                ),
+        ),
+      ],
     );
   }
 }

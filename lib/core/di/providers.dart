@@ -14,6 +14,7 @@ import '../../domain/engine/ollama_engine.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/hardware_profile.dart';
 import '../../domain/repositories/chat_repository.dart';
+import '../speech/speech_recognition.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -51,6 +52,10 @@ final hardwareDetectorProvider = Provider<HardwareDetector>((ref) {
   if (Platform.isWindows) return WindowsHardwareDetector();
   if (Platform.isAndroid) return AndroidHardwareDetector();
   return _NullHardwareDetector();
+});
+
+final speechRecognitionProvider = Provider<SpeechRecognitionService>((ref) {
+  return SpeechRecognitionService();
 });
 
 class _NullHardwareDetector implements HardwareDetector {
