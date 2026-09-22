@@ -41,8 +41,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final text = _textController.text;
     if (text.trim().isEmpty) return;
     _textController.clear();
-    final newId =
-        await ref.read(chatControllerProvider(widget.conversationId).notifier).sendMessage(text);
+    final newId = await ref
+        .read(chatControllerProvider(widget.conversationId).notifier)
+        .sendMessage(text);
     if (newId != null && mounted) {
       context.go('/chat/$newId');
     }
@@ -54,32 +55,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final uiState = ref.watch(chatControllerProvider(conversationId));
 
     if (conversationId != null) {
-      ref.listen(conversationMessagesProvider(conversationId), (_, _) => _scrollToBottom());
+      ref.listen(
+        conversationMessagesProvider(conversationId),
+        (_, _) => _scrollToBottom(),
+      );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
+      appBar: AppBar(
+        title: const Text('Chat'),
+        actions: [
+          IconButton(icon: const Icon(Icons.keyboard_voice), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.speaker_phone_rounded),
+            onPressed: () {},
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
             child: conversationId == null
                 ? const _EmptyChatState()
-                : ref.watch(conversationMessagesProvider(conversationId)).when(
-                      data: (messages) {
-                        if (messages.isEmpty) return const _EmptyChatState();
-                        return ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: messages.length,
-                          itemBuilder: (context, index) => MessageBubble(
-                            message: messages[index],
-                            isModelWarm: uiState.isModelWarm,
-                          ),
-                        );
-                      },
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('Failed to load conversation: $e')),
-                    ),
+                : ref
+                      .watch(conversationMessagesProvider(conversationId))
+                      .when(
+                        data: (messages) {
+                          if (messages.isEmpty) return const _EmptyChatState();
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) => MessageBubble(
+                              message: messages[index],
+                              isModelWarm: uiState.isModelWarm,
+                            ),
+                          );
+                        },
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => Center(
+                          child: Text('Failed to load conversation: $e'),
+                        ),
+                      ),
           ),
           if (uiState.errorMessage != null)
             Container(
@@ -88,15 +106,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               padding: const EdgeInsets.all(12),
               child: Text(
                 uiState.errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
             ),
           ChatInputBar(
             controller: _textController,
             isSending: uiState.isSending,
             onSend: _send,
-            onStop: () =>
-                ref.read(chatControllerProvider(widget.conversationId).notifier).cancel(),
+            onStop: () => ref
+                .read(chatControllerProvider(widget.conversationId).notifier)
+                .cancel(),
           ),
         ],
       ),
@@ -115,7 +136,11 @@ class _EmptyChatState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 48, color: Theme.of(context).colorScheme.outline),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
             const SizedBox(height: 12),
             const Text('Start a new conversation', textAlign: TextAlign.center),
           ],
