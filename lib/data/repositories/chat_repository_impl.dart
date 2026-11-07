@@ -40,10 +40,13 @@ class ChatRepositoryImpl implements ChatRepository {
       );
 
   AppSettings _toSettings(SettingsRow row) => AppSettings(
+        backend: row.engineBackend,
         ollamaBaseUrl: row.ollamaBaseUrl,
         ollamaPort: row.ollamaPort,
         globalSystemPrompt: row.globalSystemPrompt,
         defaultOllamaModel: row.defaultOllamaModel,
+        defaultLocalModel: row.defaultLocalModel,
+        localContextLength: row.localContextLength,
         modelKeepAliveMinutes: row.modelKeepAliveMinutes,
         ttsVoice: _decodeVoice(row.defaultTtsVoice),
       );
@@ -150,10 +153,13 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<void> updateSettings(AppSettings settings) {
     return _db.updateSettings(AppSettingsTableCompanion(
+      engineBackend: Value(settings.backend),
       ollamaBaseUrl: Value(settings.ollamaBaseUrl),
       ollamaPort: Value(settings.ollamaPort),
       globalSystemPrompt: Value(settings.globalSystemPrompt),
       defaultOllamaModel: Value(settings.defaultOllamaModel),
+      defaultLocalModel: Value(settings.defaultLocalModel),
+      localContextLength: Value(settings.localContextLength),
       modelKeepAliveMinutes: Value(settings.modelKeepAliveMinutes),
       defaultTtsVoice: Value(
         settings.ttsVoice == null || settings.ttsVoice!.isEmpty

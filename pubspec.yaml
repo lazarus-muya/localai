@@ -27,6 +27,8 @@ dependencies:
   go_router: ^15.1.0
   highlight: ^0.7.0
   json_annotation: ^4.9.0
+  llm_llamacpp:
+    path: third_party/llm_llamacpp
   markdown: ^7.2.2
   path: ^1.9.0
   path_provider: ^2.1.4

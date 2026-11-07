@@ -106,6 +106,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             itemBuilder: (context, index) => MessageBubble(
                               message: messages[index],
                               isModelWarm: uiState.isModelWarm,
+                              isLoadingModel: uiState.isLoadingModel,
                             ),
                           );
                         },

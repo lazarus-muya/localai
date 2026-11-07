@@ -632,6 +632,21 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.1"
+  llm_core:
+    dependency: transitive
+    description:
+      name: llm_core
+      sha256: "4840f92a0847d95cd558c2892d0721d6f0dc90b953000cdd8ccf84aa37f1e57c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.0"
+  llm_llamacpp:
+    dependency: "direct main"
+    description:
+      path: "third_party/llm_llamacpp"
+      relative: true
+    source: path
+    version: "0.7.0"
   logging:
     dependency: transitive
     description:

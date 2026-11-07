@@ -1211,6 +1211,42 @@ class $AppSettingsTableTable extends AppSettingsTable
     requiredDuringInsert: false,
   );
   @override
+  late final GeneratedColumnWithTypeConverter<InferenceBackend, String>
+  engineBackend =
+      GeneratedColumn<String>(
+        'engine_backend',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('remote'),
+      ).withConverter<InferenceBackend>(
+        $AppSettingsTableTable.$converterengineBackend,
+      );
+  static const VerificationMeta _defaultLocalModelMeta = const VerificationMeta(
+    'defaultLocalModel',
+  );
+  @override
+  late final GeneratedColumn<String> defaultLocalModel =
+      GeneratedColumn<String>(
+        'default_local_model',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _localContextLengthMeta =
+      const VerificationMeta('localContextLength');
+  @override
+  late final GeneratedColumn<int> localContextLength = GeneratedColumn<int>(
+    'local_context_length',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(4096),
+  );
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     ollamaBaseUrl,
@@ -1219,6 +1255,9 @@ class $AppSettingsTableTable extends AppSettingsTable
     defaultOllamaModel,
     modelKeepAliveMinutes,
     defaultTtsVoice,
+    engineBackend,
+    defaultLocalModel,
+    localContextLength,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1286,6 +1325,24 @@ class $AppSettingsTableTable extends AppSettingsTable
         ),
       );
     }
+    if (data.containsKey('default_local_model')) {
+      context.handle(
+        _defaultLocalModelMeta,
+        defaultLocalModel.isAcceptableOrUnknown(
+          data['default_local_model']!,
+          _defaultLocalModelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('local_context_length')) {
+      context.handle(
+        _localContextLengthMeta,
+        localContextLength.isAcceptableOrUnknown(
+          data['local_context_length']!,
+          _localContextLengthMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1323,6 +1380,20 @@ class $AppSettingsTableTable extends AppSettingsTable
         DriftSqlType.string,
         data['${effectivePrefix}default_tts_voice'],
       ),
+      engineBackend: $AppSettingsTableTable.$converterengineBackend.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}engine_backend'],
+        )!,
+      ),
+      defaultLocalModel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_local_model'],
+      ),
+      localContextLength: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}local_context_length'],
+      )!,
     );
   }
 
@@ -1330,6 +1401,11 @@ class $AppSettingsTableTable extends AppSettingsTable
   $AppSettingsTableTable createAlias(String alias) {
     return $AppSettingsTableTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<InferenceBackend, String, String>
+  $converterengineBackend = const EnumNameConverter<InferenceBackend>(
+    InferenceBackend.values,
+  );
 }
 
 class SettingsRow extends DataClass implements Insertable<SettingsRow> {
@@ -1340,6 +1416,15 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
   final String? defaultOllamaModel;
   final int modelKeepAliveMinutes;
   final String? defaultTtsVoice;
+
+  /// Active backend: `onDevice` (embedded llama.cpp) or `remote` (Ollama).
+  final InferenceBackend engineBackend;
+
+  /// Default model for the on-device engine (GGUF filename).
+  final String? defaultLocalModel;
+
+  /// Context window (tokens) for the on-device engine.
+  final int localContextLength;
   const SettingsRow({
     required this.id,
     required this.ollamaBaseUrl,
@@ -1348,6 +1433,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     this.defaultOllamaModel,
     required this.modelKeepAliveMinutes,
     this.defaultTtsVoice,
+    required this.engineBackend,
+    this.defaultLocalModel,
+    required this.localContextLength,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1365,6 +1453,15 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     if (!nullToAbsent || defaultTtsVoice != null) {
       map['default_tts_voice'] = Variable<String>(defaultTtsVoice);
     }
+    {
+      map['engine_backend'] = Variable<String>(
+        $AppSettingsTableTable.$converterengineBackend.toSql(engineBackend),
+      );
+    }
+    if (!nullToAbsent || defaultLocalModel != null) {
+      map['default_local_model'] = Variable<String>(defaultLocalModel);
+    }
+    map['local_context_length'] = Variable<int>(localContextLength);
     return map;
   }
 
@@ -1383,6 +1480,11 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       defaultTtsVoice: defaultTtsVoice == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultTtsVoice),
+      engineBackend: Value(engineBackend),
+      defaultLocalModel: defaultLocalModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultLocalModel),
+      localContextLength: Value(localContextLength),
     );
   }
 
@@ -1405,6 +1507,13 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
         json['modelKeepAliveMinutes'],
       ),
       defaultTtsVoice: serializer.fromJson<String?>(json['defaultTtsVoice']),
+      engineBackend: $AppSettingsTableTable.$converterengineBackend.fromJson(
+        serializer.fromJson<String>(json['engineBackend']),
+      ),
+      defaultLocalModel: serializer.fromJson<String?>(
+        json['defaultLocalModel'],
+      ),
+      localContextLength: serializer.fromJson<int>(json['localContextLength']),
     );
   }
   @override
@@ -1418,6 +1527,11 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       'defaultOllamaModel': serializer.toJson<String?>(defaultOllamaModel),
       'modelKeepAliveMinutes': serializer.toJson<int>(modelKeepAliveMinutes),
       'defaultTtsVoice': serializer.toJson<String?>(defaultTtsVoice),
+      'engineBackend': serializer.toJson<String>(
+        $AppSettingsTableTable.$converterengineBackend.toJson(engineBackend),
+      ),
+      'defaultLocalModel': serializer.toJson<String?>(defaultLocalModel),
+      'localContextLength': serializer.toJson<int>(localContextLength),
     };
   }
 
@@ -1429,6 +1543,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     Value<String?> defaultOllamaModel = const Value.absent(),
     int? modelKeepAliveMinutes,
     Value<String?> defaultTtsVoice = const Value.absent(),
+    InferenceBackend? engineBackend,
+    Value<String?> defaultLocalModel = const Value.absent(),
+    int? localContextLength,
   }) => SettingsRow(
     id: id ?? this.id,
     ollamaBaseUrl: ollamaBaseUrl ?? this.ollamaBaseUrl,
@@ -1443,6 +1560,11 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     defaultTtsVoice: defaultTtsVoice.present
         ? defaultTtsVoice.value
         : this.defaultTtsVoice,
+    engineBackend: engineBackend ?? this.engineBackend,
+    defaultLocalModel: defaultLocalModel.present
+        ? defaultLocalModel.value
+        : this.defaultLocalModel,
+    localContextLength: localContextLength ?? this.localContextLength,
   );
   SettingsRow copyWithCompanion(AppSettingsTableCompanion data) {
     return SettingsRow(
@@ -1465,6 +1587,15 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
       defaultTtsVoice: data.defaultTtsVoice.present
           ? data.defaultTtsVoice.value
           : this.defaultTtsVoice,
+      engineBackend: data.engineBackend.present
+          ? data.engineBackend.value
+          : this.engineBackend,
+      defaultLocalModel: data.defaultLocalModel.present
+          ? data.defaultLocalModel.value
+          : this.defaultLocalModel,
+      localContextLength: data.localContextLength.present
+          ? data.localContextLength.value
+          : this.localContextLength,
     );
   }
 
@@ -1477,7 +1608,10 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
           ..write('defaultOllamaModel: $defaultOllamaModel, ')
           ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes, ')
-          ..write('defaultTtsVoice: $defaultTtsVoice')
+          ..write('defaultTtsVoice: $defaultTtsVoice, ')
+          ..write('engineBackend: $engineBackend, ')
+          ..write('defaultLocalModel: $defaultLocalModel, ')
+          ..write('localContextLength: $localContextLength')
           ..write(')'))
         .toString();
   }
@@ -1491,6 +1625,9 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
     defaultOllamaModel,
     modelKeepAliveMinutes,
     defaultTtsVoice,
+    engineBackend,
+    defaultLocalModel,
+    localContextLength,
   );
   @override
   bool operator ==(Object other) =>
@@ -1502,7 +1639,10 @@ class SettingsRow extends DataClass implements Insertable<SettingsRow> {
           other.globalSystemPrompt == this.globalSystemPrompt &&
           other.defaultOllamaModel == this.defaultOllamaModel &&
           other.modelKeepAliveMinutes == this.modelKeepAliveMinutes &&
-          other.defaultTtsVoice == this.defaultTtsVoice);
+          other.defaultTtsVoice == this.defaultTtsVoice &&
+          other.engineBackend == this.engineBackend &&
+          other.defaultLocalModel == this.defaultLocalModel &&
+          other.localContextLength == this.localContextLength);
 }
 
 class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
@@ -1513,6 +1653,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
   final Value<String?> defaultOllamaModel;
   final Value<int> modelKeepAliveMinutes;
   final Value<String?> defaultTtsVoice;
+  final Value<InferenceBackend> engineBackend;
+  final Value<String?> defaultLocalModel;
+  final Value<int> localContextLength;
   const AppSettingsTableCompanion({
     this.id = const Value.absent(),
     this.ollamaBaseUrl = const Value.absent(),
@@ -1521,6 +1664,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     this.defaultOllamaModel = const Value.absent(),
     this.modelKeepAliveMinutes = const Value.absent(),
     this.defaultTtsVoice = const Value.absent(),
+    this.engineBackend = const Value.absent(),
+    this.defaultLocalModel = const Value.absent(),
+    this.localContextLength = const Value.absent(),
   });
   AppSettingsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -1530,6 +1676,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     this.defaultOllamaModel = const Value.absent(),
     this.modelKeepAliveMinutes = const Value.absent(),
     this.defaultTtsVoice = const Value.absent(),
+    this.engineBackend = const Value.absent(),
+    this.defaultLocalModel = const Value.absent(),
+    this.localContextLength = const Value.absent(),
   });
   static Insertable<SettingsRow> custom({
     Expression<int>? id,
@@ -1539,6 +1688,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Expression<String>? defaultOllamaModel,
     Expression<int>? modelKeepAliveMinutes,
     Expression<String>? defaultTtsVoice,
+    Expression<String>? engineBackend,
+    Expression<String>? defaultLocalModel,
+    Expression<int>? localContextLength,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1551,6 +1703,10 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
       if (modelKeepAliveMinutes != null)
         'model_keep_alive_minutes': modelKeepAliveMinutes,
       if (defaultTtsVoice != null) 'default_tts_voice': defaultTtsVoice,
+      if (engineBackend != null) 'engine_backend': engineBackend,
+      if (defaultLocalModel != null) 'default_local_model': defaultLocalModel,
+      if (localContextLength != null)
+        'local_context_length': localContextLength,
     });
   }
 
@@ -1562,6 +1718,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     Value<String?>? defaultOllamaModel,
     Value<int>? modelKeepAliveMinutes,
     Value<String?>? defaultTtsVoice,
+    Value<InferenceBackend>? engineBackend,
+    Value<String?>? defaultLocalModel,
+    Value<int>? localContextLength,
   }) {
     return AppSettingsTableCompanion(
       id: id ?? this.id,
@@ -1572,6 +1731,9 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
       modelKeepAliveMinutes:
           modelKeepAliveMinutes ?? this.modelKeepAliveMinutes,
       defaultTtsVoice: defaultTtsVoice ?? this.defaultTtsVoice,
+      engineBackend: engineBackend ?? this.engineBackend,
+      defaultLocalModel: defaultLocalModel ?? this.defaultLocalModel,
+      localContextLength: localContextLength ?? this.localContextLength,
     );
   }
 
@@ -1601,6 +1763,19 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
     if (defaultTtsVoice.present) {
       map['default_tts_voice'] = Variable<String>(defaultTtsVoice.value);
     }
+    if (engineBackend.present) {
+      map['engine_backend'] = Variable<String>(
+        $AppSettingsTableTable.$converterengineBackend.toSql(
+          engineBackend.value,
+        ),
+      );
+    }
+    if (defaultLocalModel.present) {
+      map['default_local_model'] = Variable<String>(defaultLocalModel.value);
+    }
+    if (localContextLength.present) {
+      map['local_context_length'] = Variable<int>(localContextLength.value);
+    }
     return map;
   }
 
@@ -1613,7 +1788,10 @@ class AppSettingsTableCompanion extends UpdateCompanion<SettingsRow> {
           ..write('globalSystemPrompt: $globalSystemPrompt, ')
           ..write('defaultOllamaModel: $defaultOllamaModel, ')
           ..write('modelKeepAliveMinutes: $modelKeepAliveMinutes, ')
-          ..write('defaultTtsVoice: $defaultTtsVoice')
+          ..write('defaultTtsVoice: $defaultTtsVoice, ')
+          ..write('engineBackend: $engineBackend, ')
+          ..write('defaultLocalModel: $defaultLocalModel, ')
+          ..write('localContextLength: $localContextLength')
           ..write(')'))
         .toString();
   }
@@ -2424,6 +2602,9 @@ typedef $$AppSettingsTableTableCreateCompanionBuilder =
       Value<String?> defaultOllamaModel,
       Value<int> modelKeepAliveMinutes,
       Value<String?> defaultTtsVoice,
+      Value<InferenceBackend> engineBackend,
+      Value<String?> defaultLocalModel,
+      Value<int> localContextLength,
     });
 typedef $$AppSettingsTableTableUpdateCompanionBuilder =
     AppSettingsTableCompanion Function({
@@ -2434,6 +2615,9 @@ typedef $$AppSettingsTableTableUpdateCompanionBuilder =
       Value<String?> defaultOllamaModel,
       Value<int> modelKeepAliveMinutes,
       Value<String?> defaultTtsVoice,
+      Value<InferenceBackend> engineBackend,
+      Value<String?> defaultLocalModel,
+      Value<int> localContextLength,
     });
 
 class $$AppSettingsTableTableFilterComposer
@@ -2477,6 +2661,22 @@ class $$AppSettingsTableTableFilterComposer
 
   ColumnFilters<String> get defaultTtsVoice => $composableBuilder(
     column: $table.defaultTtsVoice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<InferenceBackend, InferenceBackend, String>
+  get engineBackend => $composableBuilder(
+    column: $table.engineBackend,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get defaultLocalModel => $composableBuilder(
+    column: $table.defaultLocalModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get localContextLength => $composableBuilder(
+    column: $table.localContextLength,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2524,6 +2724,21 @@ class $$AppSettingsTableTableOrderingComposer
     column: $table.defaultTtsVoice,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get engineBackend => $composableBuilder(
+    column: $table.engineBackend,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultLocalModel => $composableBuilder(
+    column: $table.defaultLocalModel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get localContextLength => $composableBuilder(
+    column: $table.localContextLength,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableTableAnnotationComposer
@@ -2565,6 +2780,22 @@ class $$AppSettingsTableTableAnnotationComposer
 
   GeneratedColumn<String> get defaultTtsVoice => $composableBuilder(
     column: $table.defaultTtsVoice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<InferenceBackend, String>
+  get engineBackend => $composableBuilder(
+    column: $table.engineBackend,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultLocalModel => $composableBuilder(
+    column: $table.defaultLocalModel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get localContextLength => $composableBuilder(
+    column: $table.localContextLength,
     builder: (column) => column,
   );
 }
@@ -2609,6 +2840,9 @@ class $$AppSettingsTableTableTableManager
                 Value<String?> defaultOllamaModel = const Value.absent(),
                 Value<int> modelKeepAliveMinutes = const Value.absent(),
                 Value<String?> defaultTtsVoice = const Value.absent(),
+                Value<InferenceBackend> engineBackend = const Value.absent(),
+                Value<String?> defaultLocalModel = const Value.absent(),
+                Value<int> localContextLength = const Value.absent(),
               }) => AppSettingsTableCompanion(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
@@ -2617,6 +2851,9 @@ class $$AppSettingsTableTableTableManager
                 defaultOllamaModel: defaultOllamaModel,
                 modelKeepAliveMinutes: modelKeepAliveMinutes,
                 defaultTtsVoice: defaultTtsVoice,
+                engineBackend: engineBackend,
+                defaultLocalModel: defaultLocalModel,
+                localContextLength: localContextLength,
               ),
           createCompanionCallback:
               ({
@@ -2627,6 +2864,9 @@ class $$AppSettingsTableTableTableManager
                 Value<String?> defaultOllamaModel = const Value.absent(),
                 Value<int> modelKeepAliveMinutes = const Value.absent(),
                 Value<String?> defaultTtsVoice = const Value.absent(),
+                Value<InferenceBackend> engineBackend = const Value.absent(),
+                Value<String?> defaultLocalModel = const Value.absent(),
+                Value<int> localContextLength = const Value.absent(),
               }) => AppSettingsTableCompanion.insert(
                 id: id,
                 ollamaBaseUrl: ollamaBaseUrl,
@@ -2635,6 +2875,9 @@ class $$AppSettingsTableTableTableManager
                 defaultOllamaModel: defaultOllamaModel,
                 modelKeepAliveMinutes: modelKeepAliveMinutes,
                 defaultTtsVoice: defaultTtsVoice,
+                engineBackend: engineBackend,
+                defaultLocalModel: defaultLocalModel,
+                localContextLength: localContextLength,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

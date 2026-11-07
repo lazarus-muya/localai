@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+import '../../../domain/entities/app_settings.dart' show InferenceBackend;
 import '../../../domain/entities/message.dart' show ChatRole, MessageStatus;
 
 part 'app_database.g.dart';
@@ -46,6 +47,16 @@ class AppSettingsTable extends Table {
   IntColumn get modelKeepAliveMinutes => integer().withDefault(const Constant(20))();
   TextColumn get defaultTtsVoice => text().nullable()();
 
+  /// Active backend: `onDevice` (embedded llama.cpp) or `remote` (Ollama).
+  TextColumn get engineBackend => textEnum<InferenceBackend>()
+      .withDefault(const Constant('remote'))();
+
+  /// Default model for the on-device engine (GGUF filename).
+  TextColumn get defaultLocalModel => text().nullable()();
+
+  /// Context window (tokens) for the on-device engine.
+  IntColumn get localContextLength => integer().withDefault(const Constant(4096))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -55,33 +66,67 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'localai_db'));
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
+          // Every step below is guarded by an existence check so the upgrade
+          // is idempotent. A previous build could have applied a step without
+          // the schema version being persisted (crash/interrupt mid-upgrade,
+          // a version bumped after the column was already added), which would
+          // otherwise re-run `ADD COLUMN` on a column that already exists and
+          // abort the whole migration with "duplicate column name".
+          Future<void> addColumnIfMissing(GeneratedColumn column) async {
+            if (await _hasColumn(appSettingsTable.actualTableName, column.name)) {
+              return;
+            }
+            await m.addColumn(appSettingsTable, column);
+          }
+
+          Future<void> dropColumnIfPresent(String name) async {
+            if (await _hasColumn(appSettingsTable.actualTableName, name)) {
+              await m.dropColumn(appSettingsTable, name);
+            }
+          }
+
           if (from < 2) {
-            await m.addColumn(appSettingsTable, appSettingsTable.modelKeepAliveMinutes);
+            await addColumnIfMissing(appSettingsTable.modelKeepAliveMinutes);
           }
           if (from == 3) {
             // Only version 3 databases ever had this column (added and
             // dropped within the same unreleased dev cycle).
-            await m.dropColumn(appSettingsTable, 'llama_library_path');
+            await dropColumnIfPresent('llama_library_path');
           }
           if (from < 5) {
-            // The in-app (on-device) llama.cpp engine has been removed —
-            // chat always goes through a remote Ollama server now.
+            // The in-app (on-device) llama.cpp engine had been removed. Older
+            // databases from that era may still carry these columns.
             if (from >= 3) {
-              await m.dropColumn(appSettingsTable, 'engine_mode');
-              await m.dropColumn(appSettingsTable, 'default_local_model');
+              await dropColumnIfPresent('engine_mode');
+              await dropColumnIfPresent('default_local_model');
             }
           }
           if (from < 6) {
-            await m.addColumn(appSettingsTable, appSettingsTable.defaultTtsVoice);
+            await addColumnIfMissing(appSettingsTable.defaultTtsVoice);
+          }
+          if (from < 7) {
+            // Re-introduce a real on-device backend alongside the remote
+            // Ollama one. `default_local_model` may have been dropped in v5,
+            // so re-add it plus the new backend/context columns.
+            await addColumnIfMissing(appSettingsTable.engineBackend);
+            await addColumnIfMissing(appSettingsTable.defaultLocalModel);
+            await addColumnIfMissing(appSettingsTable.localContextLength);
           }
         },
       );
+
+  /// Whether [table] already has a column named [column], per SQLite's
+  /// `PRAGMA table_info`. Used to make migration steps idempotent.
+  Future<bool> _hasColumn(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info($table);').get();
+    return rows.any((row) => row.read<String>('name') == column);
+  }
 
   Stream<List<ConversationRow>> watchConversations() {
     return (select(conversations)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();

@@ -185,6 +185,9 @@ class OllamaEngine implements InferenceEngine {
   }
 
   @override
+  Future<void> preloadModel({required String baseUrl, required String model}) async {}
+
+  @override
   Future<void> pullModel({
     required String baseUrl,
     required String model,

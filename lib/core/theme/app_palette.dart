@@ -75,6 +75,44 @@ class AppPalette extends ThemeExtension<AppPalette> {
     warning: Color(0xFFB2790A),
   );
 
+  /// Windows 11 (Fluent) neutrals: Mica-like base, white/raised cards with
+  /// hairline borders, and the system-style blue accent.
+  static const windowsLight = AppPalette(
+    background: Color(0xFFF3F3F3),
+    sidebarBackground: Color(0xFFEEEEEE),
+    sidebarBorder: Color(0xFFE0E0E0),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE5E5E5),
+    inputFill: Color(0xFFFFFFFF),
+    divider: Color(0xFFE5E5E5),
+    textPrimary: Color(0xFF1A1A1A),
+    mutedText: Color(0xFF5F5F5F),
+    groupLabel: Color(0xFF5F5F5F),
+    accent: Color(0xFF0067C0),
+    onAccent: Color(0xFFFFFFFF),
+    danger: Color(0xFFC42B1C),
+    success: Color(0xFF0F7B0F),
+    warning: Color(0xFF9D5D00),
+  );
+
+  static const windowsDark = AppPalette(
+    background: Color(0xFF202020),
+    sidebarBackground: Color(0xFF1C1C1C),
+    sidebarBorder: Color(0xFF2B2B2B),
+    cardBackground: Color(0xFF2B2B2B),
+    cardBorder: Color(0xFF3A3A3A),
+    inputFill: Color(0xFF2D2D2D),
+    divider: Color(0xFF3A3A3A),
+    textPrimary: Color(0xFFFFFFFF),
+    mutedText: Color(0xFFC5C5C5),
+    groupLabel: Color(0xFFC5C5C5),
+    accent: Color(0xFF4CC2FF),
+    onAccent: Color(0xFF000000),
+    danger: Color(0xFFFF99A4),
+    success: Color(0xFF6CCB5F),
+    warning: Color(0xFFFCE100),
+  );
+
   @override
   AppPalette copyWith({
     Color? background,

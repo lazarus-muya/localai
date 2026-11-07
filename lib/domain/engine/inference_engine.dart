@@ -17,12 +17,18 @@ class ChatDelta {
     required this.done,
     this.evalCount,
     this.tokensPerSecond,
+    this.loading = false,
   });
 
   final String contentDelta;
   final bool done;
   final int? evalCount;
   final double? tokensPerSecond;
+
+  /// Emitted once before the first token while a model is still being loaded
+  /// into memory, so the UI can show a loading state instead of appearing
+  /// stalled. Carries no content and is never the terminal delta.
+  final bool loading;
 }
 
 class EngineModelInfo {
@@ -58,6 +64,10 @@ abstract class InferenceEngine {
   /// running-models endpoint. Used to tell a genuine cold start apart from
   /// an ordinary slow response so the UI doesn't misreport one as the other.
   Future<bool> isModelLoaded({required String baseUrl, required String model});
+
+  /// Loads [model] into memory ahead of the first chat so that turn does not
+  /// pay the load cost. A no-op for engines whose server manages residency.
+  Future<void> preloadModel({required String baseUrl, required String model});
 
   Future<void> pullModel({
     required String baseUrl,

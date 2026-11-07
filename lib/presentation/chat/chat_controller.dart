@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/di/providers.dart';
 import '../../core/error/app_exception.dart';
 import '../../domain/engine/inference_engine.dart';
+import '../../domain/entities/app_settings.dart' show InferenceBackend;
 import '../../domain/entities/inference_settings.dart';
 import '../../domain/entities/message.dart';
 
@@ -35,7 +36,12 @@ final conversationMessagesProvider =
 });
 
 class ChatUiState {
-  const ChatUiState({this.isSending = false, this.errorMessage, this.isModelWarm});
+  const ChatUiState({
+    this.isSending = false,
+    this.errorMessage,
+    this.isModelWarm,
+    this.isLoadingModel = false,
+  });
 
   final bool isSending;
   final String? errorMessage;
@@ -45,6 +51,25 @@ class ChatUiState {
   /// an older Ollama server without `/api/ps`) — the UI falls back to a
   /// time-based guess in that case.
   final bool? isModelWarm;
+
+  /// True between "send" and the first generated token for an on-device model,
+  /// while the GGUF is still being read into memory. Lets the UI show a
+  /// loading indicator rather than a stalled empty bubble.
+  final bool isLoadingModel;
+
+  ChatUiState copyWith({
+    bool? isSending,
+    String? errorMessage,
+    bool? isModelWarm,
+    bool? isLoadingModel,
+  }) {
+    return ChatUiState(
+      isSending: isSending ?? this.isSending,
+      errorMessage: errorMessage ?? this.errorMessage,
+      isModelWarm: isModelWarm ?? this.isModelWarm,
+      isLoadingModel: isLoadingModel ?? this.isLoadingModel,
+    );
+  }
 }
 
 /// Orchestrates a single conversation's send/stream/cancel lifecycle. Keyed
@@ -95,20 +120,41 @@ class ChatController extends Notifier<ChatUiState> {
     final conversationId = arg!;
     final repo = ref.read(chatRepositoryProvider);
     var settings = await repo.getSettings();
-    final engine = ref.read(ollamaEngineProvider);
+    final isOnDevice = settings.backend == InferenceBackend.onDevice;
+    // Pick the engine from the freshly read settings: activeEngineProvider
+    // can still hold its pre-load Ollama default right after startup.
+    final InferenceEngine engine = isOnDevice
+        ? ref.read(llamaCppEngineProvider)
+        : ref.read(ollamaEngineProvider);
     final baseUrl = settings.ollamaServerUrl;
 
-    var modelName = settings.defaultOllamaModel;
+    var modelName = settings.activeDefaultModel;
 
-    if (modelName == null || modelName.trim().isEmpty) {
-      // No default model chosen yet — fall back to the first model already
-      // installed, if any, rather than blocking the chat.
+    // On-device models are plain files that can be deleted from the Models tab,
+    // so a stored default may point at a model that no longer exists.
+    var defaultMissing = modelName == null || modelName.trim().isEmpty;
+    if (!defaultMissing && isOnDevice) {
+      try {
+        final installed = await engine.listModels(baseUrl: baseUrl);
+        defaultMissing = !installed.any((m) => m.name == modelName);
+      } catch (_) {
+        // Let the engine report the problem.
+      }
+    }
+
+    if (defaultMissing) {
+      // No usable default model — fall back to the first model already
+      // available on the active backend, if any, rather than blocking the chat.
       try {
         final installed = await engine.listModels(baseUrl: baseUrl);
         if (installed.isNotEmpty) {
           modelName = installed.first.name;
-          settings = settings.copyWith(defaultOllamaModel: modelName);
+          settings = isOnDevice
+              ? settings.copyWith(defaultLocalModel: modelName)
+              : settings.copyWith(defaultOllamaModel: modelName);
           await repo.updateSettings(settings);
+        } else if (isOnDevice) {
+          modelName = null; // Stale default and nothing left to use.
         }
       } catch (_) {
         // Ignore — handled by the empty-model check below.
@@ -116,8 +162,10 @@ class ChatController extends Notifier<ChatUiState> {
     }
 
     if (modelName == null || modelName.trim().isEmpty) {
-      state = const ChatUiState(
-        errorMessage: 'Set a default Ollama model in Settings before starting a chat.',
+      state = ChatUiState(
+        errorMessage: isOnDevice
+            ? 'Download a model from the Models tab, then set it as the on-device default in Settings.'
+            : 'Set a default Ollama model in Settings before starting a chat.',
       );
       return;
     }
@@ -157,7 +205,12 @@ class ChatController extends Notifier<ChatUiState> {
     final cancelSignal = CancelSignal();
     _activeCancelSignal = cancelSignal;
 
-    final turns = history.map((m) => ChatTurn(role: m.role, content: m.content)).toList();
+    // Skip empty messages (e.g. an assistant reply that failed before any
+    // token arrived): servers reject them with HTTP 400.
+    final turns = history
+        .where((m) => m.content.trim().isNotEmpty)
+        .map((m) => ChatTurn(role: m.role, content: m.content))
+        .toList();
     final buffer = StringBuffer();
     Timer? flushTimer;
     var lastFlushed = '';
@@ -176,6 +229,7 @@ class ChatController extends Notifier<ChatUiState> {
       final inferenceSettings = InferenceSettings(
         systemPrompt: settings.globalSystemPrompt,
         keepAliveMinutes: settings.modelKeepAliveMinutes,
+        contextLength: settings.localContextLength,
       );
 
       await for (final delta in engine.chatStream(
@@ -186,6 +240,9 @@ class ChatController extends Notifier<ChatUiState> {
         cancelSignal: cancelSignal,
       )) {
         buffer.write(delta.contentDelta);
+        if (delta.loading) {
+          state = state.copyWith(isLoadingModel: true);
+        }
         flushTimer ??= Timer.periodic(const Duration(milliseconds: 120), (_) => flush());
         if (delta.done) {
           flushTimer.cancel();

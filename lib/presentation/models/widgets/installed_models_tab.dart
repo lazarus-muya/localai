@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/providers.dart';
 import '../../../core/theme/app_palette.dart';
+import '../../../domain/entities/app_settings.dart' show InferenceBackend;
 import '../../../domain/entities/hardware_profile.dart';
 import '../../shared/format_bytes.dart';
 import '../../shared/widgets/settings_section.dart';
@@ -36,6 +38,10 @@ class InstalledModelsTab extends ConsumerWidget {
     final modelsAsync = ref.watch(installedModelsProvider);
     final hardwareAsync = ref.watch(hardwareProfileProvider);
     final downloads = ref.watch(downloadManagerProvider);
+    final backend = ref
+        .watch(appSettingsProvider)
+        .maybeWhen(data: (s) => s.backend, orElse: () => InferenceBackend.remote);
+    final isOnDevice = backend == InferenceBackend.onDevice;
 
     final palette = context.palette;
 
@@ -50,6 +56,14 @@ class InstalledModelsTab extends ConsumerWidget {
             error: (e, _) => Text('Hardware detection failed: $e'),
           ),
           const SizedBox(height: 16),
+          Text(
+            isOnDevice
+                ? 'Models are stored on this device and loaded by the embedded '
+                    'engine. No server required.'
+                : 'Models are registered on your Ollama server.',
+            style: TextStyle(color: palette.mutedText, fontSize: 12.5),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -110,7 +124,9 @@ class InstalledModelsTab extends ConsumerWidget {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'No models installed yet. Get one from the HuggingFace tab.',
+                    isOnDevice
+                        ? 'No models downloaded yet. Get one from the HuggingFace tab.'
+                        : 'No models installed yet. Get one from the HuggingFace tab.',
                     style: TextStyle(color: palette.mutedText),
                   ),
                 );

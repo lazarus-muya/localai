@@ -8,8 +8,11 @@ import '../../data/hardware/hardware_detector.dart';
 import '../../data/hardware/hardware_detector_android.dart';
 import '../../data/hardware/hardware_detector_windows.dart';
 import '../../data/local/database/app_database.dart';
+import '../../data/local/local_model_store.dart';
 import '../../data/remote/huggingface/huggingface_api_client.dart';
 import '../../data/repositories/chat_repository_impl.dart';
+import '../../domain/engine/inference_engine.dart';
+import '../../domain/engine/llama_cpp_engine.dart';
 import '../../domain/engine/ollama_engine.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/hardware_profile.dart';
@@ -38,6 +41,52 @@ final dioProvider = Provider<Dio>((ref) => Dio());
 
 final ollamaEngineProvider = Provider<OllamaEngine>((ref) {
   return OllamaEngine(ref.watch(dioProvider));
+});
+
+final llamaCppEngineProvider = Provider<LlamaCppEngine>((ref) {
+  final engine = LlamaCppEngine();
+  ref.onDispose(engine.dispose);
+  return engine;
+});
+
+final localModelStoreProvider = Provider<LocalModelStore>((ref) {
+  return const LocalModelStore();
+});
+
+/// The `InferenceEngine` matching the active backend. Defaults to the remote
+/// (Ollama) engine until settings load, mirroring the persisted default.
+final activeEngineProvider = Provider<InferenceEngine>((ref) {
+  final backend = ref
+      .watch(appSettingsProvider)
+      .maybeWhen(data: (s) => s.backend, orElse: () => InferenceBackend.remote);
+  return backend == InferenceBackend.onDevice
+      ? ref.watch(llamaCppEngineProvider)
+      : ref.watch(ollamaEngineProvider);
+});
+
+/// Loads the on-device model once at startup: the saved default (last used)
+/// model, or the first downloaded one if there is no default or it was
+/// deleted. Watched from the app root; failures are swallowed because the
+/// first chat will load the model and report any real error itself.
+final startupModelPreloadProvider = FutureProvider<void>((ref) async {
+  final settings = await ref.read(appSettingsProvider.future);
+  if (settings.backend != InferenceBackend.onDevice) return;
+
+  try {
+    final engine = ref.read(llamaCppEngineProvider);
+    final baseUrl = settings.ollamaServerUrl;
+    final installed = await engine.listModels(baseUrl: baseUrl);
+    if (installed.isEmpty) return;
+
+    var model = settings.defaultLocalModel;
+    if (model == null || !installed.any((m) => m.name == model)) {
+      model = installed.first.name;
+      await ref
+          .read(chatRepositoryProvider)
+          .updateSettings(settings.copyWith(defaultLocalModel: model));
+    }
+    await engine.preloadModel(baseUrl: baseUrl, model: model);
+  } catch (_) {}
 });
 
 final huggingFaceApiClientProvider = Provider<HuggingFaceApiClient>((ref) {

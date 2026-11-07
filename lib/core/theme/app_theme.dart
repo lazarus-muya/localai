@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app_palette.dart';
@@ -6,11 +7,19 @@ import 'app_palette.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light() => _build(AppPalette.light, Brightness.light);
+  static bool get _isWindows => defaultTargetPlatform == TargetPlatform.windows;
 
-  static ThemeData dark() => _build(AppPalette.dark, Brightness.dark);
+  static ThemeData light() =>
+      _build(_isWindows ? AppPalette.windowsLight : AppPalette.light, Brightness.light);
+
+  static ThemeData dark() =>
+      _build(_isWindows ? AppPalette.windowsDark : AppPalette.dark, Brightness.dark);
 
   static ThemeData _build(AppPalette p, Brightness brightness) {
+    final win = _isWindows;
+    // Fluent uses small corners; Material's big pills read as "web app".
+    final rControl = win ? 4.0 : 8.0;
+    final rSurface = win ? 8.0 : 12.0;
     final colorScheme = ColorScheme.fromSeed(
       seedColor: p.accent,
       brightness: brightness,
@@ -23,11 +32,38 @@ class AppTheme {
       outlineVariant: p.divider,
     );
 
-    final base = ThemeData(useMaterial3: true, brightness: brightness, colorScheme: colorScheme);
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: colorScheme,
+      fontFamily: win ? 'Segoe UI' : null,
+      visualDensity: win ? VisualDensity.compact : VisualDensity.standard,
+      splashFactory: win ? NoSplash.splashFactory : null,
+    );
 
     return base.copyWith(
       scaffoldBackgroundColor: p.background,
       extensions: [p],
+      hoverColor: p.textPrimary.withValues(alpha: 0.05),
+      highlightColor: win ? p.textPrimary.withValues(alpha: 0.07) : null,
+      scrollbarTheme: win
+          ? ScrollbarThemeData(
+              thickness: const WidgetStatePropertyAll(6),
+              radius: const Radius.circular(3),
+              thumbColor: WidgetStatePropertyAll(p.mutedText.withValues(alpha: 0.5)),
+            )
+          : null,
+      tooltipTheme: win
+          ? TooltipThemeData(
+              decoration: BoxDecoration(
+                color: p.cardBackground,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: p.cardBorder),
+              ),
+              textStyle: TextStyle(color: p.textPrimary, fontSize: 12),
+              waitDuration: const Duration(milliseconds: 500),
+            )
+          : null,
       // Swap the Material default zoom/scale page transition (Android's
       // ZoomPageTransitionsBuilder) for a subtle fade+slide. Top-level nav
       // in this app is transition-free (see app_router.dart), so this only
@@ -52,8 +88,8 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
           color: p.textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontSize: win ? 20 : 18,
+          fontWeight: win ? FontWeight.w600 : FontWeight.w600,
         ),
       ),
       cardTheme: CardThemeData(
@@ -61,7 +97,7 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(rSurface),
           side: BorderSide(color: p.cardBorder),
         ),
       ),
@@ -73,30 +109,36 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         hintStyle: TextStyle(color: p.mutedText),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(rControl),
           borderSide: BorderSide(color: p.cardBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(rControl),
           borderSide: BorderSide(color: p.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: p.accent, width: 1.5),
+          borderRadius: BorderRadius.circular(rControl),
+          borderSide: BorderSide(color: p.accent, width: win ? 2 : 1.5),
         ),
       ),
       switchTheme: SwitchThemeData(
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return p.accent;
-          return p.cardBorder;
+          return win ? Colors.transparent : p.cardBorder;
         }),
-        thumbColor: const WidgetStatePropertyAll(Colors.white),
-        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (!win || states.contains(WidgetState.selected)) return p.onAccent;
+          return p.mutedText;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (win && !states.contains(WidgetState.selected)) return p.mutedText;
+          return Colors.transparent;
+        }),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: p.cardBackground,
         side: BorderSide(color: p.cardBorder),
-        shape: const StadiumBorder(),
+        shape: win ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)) : const StadiumBorder(),
         labelStyle: TextStyle(color: p.textPrimary, fontSize: 12),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
@@ -105,7 +147,7 @@ class AppTheme {
         backgroundColor: p.cardBackground,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(rSurface),
           side: BorderSide(color: p.cardBorder),
         ),
       ),
@@ -120,7 +162,7 @@ class AppTheme {
         color: p.cardBackground,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(win ? 8 : 10),
           side: BorderSide(color: p.cardBorder),
         ),
       ),
@@ -150,18 +192,21 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: p.textPrimary,
           side: BorderSide(color: p.cardBorder),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rControl)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: p.accent,
           foregroundColor: p.onAccent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rControl)),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rControl)),
+          ),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) return p.accent;
             return p.inputFill;

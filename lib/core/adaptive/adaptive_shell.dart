@@ -137,7 +137,7 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Container(
-      width: 232,
+      width: 240,
       decoration: BoxDecoration(
         color: palette.sidebarBackground,
         border: Border(right: BorderSide(color: palette.sidebarBorder)),
@@ -147,28 +147,14 @@ class _Sidebar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: const Icon(Icons.bolt, size: 18, color: Colors.white),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'LocalAi',
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 10),
+              child: Text(
+                'LocalAi',
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Expanded(
@@ -206,12 +192,11 @@ class _SidebarGroup extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
               child: Text(
-                group.label!.toUpperCase(),
+                group.label!,
                 style: TextStyle(
                   color: palette.groupLabel,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
@@ -240,35 +225,45 @@ class _SidebarItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
-        color: Colors.transparent,
+        color: selected ? palette.textPrimary.withValues(alpha: 0.07) : Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: BoxDecoration(
-              color: selected ? palette.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selected ? destination.selectedIcon : destination.icon,
-                  size: 19,
-                  color: selected ? palette.onAccent : palette.mutedText,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected ? destination.selectedIcon : destination.icon,
+                      size: 18,
+                      color: selected ? palette.accent : palette.textPrimary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      destination.label,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  destination.label,
-                  style: TextStyle(
-                    color: selected ? palette.onAccent : palette.textPrimary,
-                    fontSize: 13.5,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+              if (selected)
+                Container(
+                  width: 3,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: palette.accent,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

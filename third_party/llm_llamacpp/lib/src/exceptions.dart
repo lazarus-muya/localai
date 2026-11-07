@@ -1,0 +1,243 @@
+import 'package:llm_llamacpp/src/model_converter.dart';
+
+// ============================================================
+// Model Exceptions
+// ============================================================
+
+/// Thrown when a requested model file is not found in the repository.
+class ModelNotFoundException implements Exception {
+  ModelNotFoundException({
+    required this.repoId,
+    required this.message,
+    this.availableFiles = const [],
+  });
+
+  /// The HuggingFace repository ID.
+  final String repoId;
+
+  /// Error message.
+  final String message;
+
+  /// List of available GGUF files in the repository.
+  final List<String> availableFiles;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('ModelNotFoundException: $message\n');
+    buffer.writeln("Repository: '$repoId'");
+
+    if (availableFiles.isNotEmpty) {
+      buffer.writeln('\nAvailable GGUF files:');
+      for (final file in availableFiles) {
+        buffer.writeln('  - $file');
+      }
+      buffer.writeln(
+        "\nSpecify file: getModel('$repoId', preferredFile: '${availableFiles.first}')",
+      );
+    }
+
+    return buffer.toString();
+  }
+}
+
+/// Thrown when multiple GGUF files match the requested criteria.
+class AmbiguousModelException implements Exception {
+  AmbiguousModelException({
+    required this.repoId,
+    required this.message,
+    required this.matchingFiles,
+  });
+
+  /// The HuggingFace repository ID.
+  final String repoId;
+
+  /// Error message.
+  final String message;
+
+  /// List of files that matched the criteria.
+  final List<String> matchingFiles;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('AmbiguousModelException: $message\n');
+    buffer.writeln("Repository: '$repoId'");
+    buffer.writeln('\nMatching files:');
+    for (final file in matchingFiles) {
+      buffer.writeln('  - $file');
+    }
+    buffer.writeln(
+      "\nSpecify file: getModel('$repoId', preferredFile: '${matchingFiles.first}')",
+    );
+    return buffer.toString();
+  }
+}
+
+/// Thrown when a repository only has safetensors and quantization is required.
+class ConversionRequiredException implements Exception {
+  ConversionRequiredException({required this.repoId, required this.message});
+
+  /// The HuggingFace repository ID.
+  final String repoId;
+
+  /// Error message.
+  final String message;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('ConversionRequiredException: $message\n');
+    buffer.writeln("Repository: '$repoId' only has safetensors (no GGUF).");
+    buffer.writeln('Conversion requires a quantization parameter.\n');
+    buffer.writeln(
+      "Example: getModel('$repoId', quantization: QuantizationType.q4_k_m)",
+    );
+    buffer.writeln('\nAvailable quantizations:');
+    for (final q in QuantizationType.values) {
+      buffer.writeln('  - ${q.name} (${q.displayName})');
+    }
+    return buffer.toString();
+  }
+}
+
+/// Thrown when a repository has no usable model files.
+class UnsupportedModelException implements Exception {
+  UnsupportedModelException({required this.repoId, required this.message});
+
+  /// The HuggingFace repository ID.
+  final String repoId;
+
+  /// Error message.
+  final String message;
+
+  @override
+  String toString() {
+    return "UnsupportedModelException: $message\nRepository: '$repoId'";
+  }
+}
+
+// ============================================================
+// Backend Exceptions
+// ============================================================
+
+/// Thrown when llama.cpp backend initialization fails.
+class BackendInitException implements Exception {
+  BackendInitException({required this.message, this.details});
+
+  /// Error message.
+  final String message;
+
+  /// Additional error details, if available.
+  final String? details;
+
+  @override
+  String toString() {
+    if (details != null) {
+      return 'BackendInitException: $message\nDetails: $details';
+    }
+    return 'BackendInitException: $message';
+  }
+}
+
+/// Thrown when inference fails.
+class InferenceException implements Exception {
+  InferenceException({required this.message, this.details});
+
+  /// Error message.
+  final String message;
+
+  /// Additional error details, if available.
+  final String? details;
+
+  @override
+  String toString() {
+    if (details != null) {
+      return 'InferenceException: $message\nDetails: $details';
+    }
+    return 'InferenceException: $message';
+  }
+}
+
+/// Thrown when context creation fails.
+class ContextCreationException implements Exception {
+  ContextCreationException({
+    required this.message,
+    this.contextSize,
+    this.batchSize,
+  });
+
+  /// Error message.
+  final String message;
+
+  /// The context size that was requested.
+  final int? contextSize;
+
+  /// The batch size that was requested.
+  final int? batchSize;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('ContextCreationException: $message');
+    if (contextSize != null || batchSize != null) {
+      buffer.write('\nRequested:');
+      if (contextSize != null) {
+        buffer.write(' contextSize=$contextSize');
+      }
+      if (batchSize != null) {
+        buffer.write(' batchSize=$batchSize');
+      }
+    }
+    return buffer.toString();
+  }
+}
+
+// ============================================================
+// LoRA Exceptions
+// ============================================================
+
+/// Thrown when a LoRA adapter fails to load.
+class LoraLoadException implements Exception {
+  LoraLoadException({required this.path, required this.message});
+
+  /// Path to the LoRA file that failed to load.
+  final String path;
+
+  /// Error message.
+  final String message;
+
+  @override
+  String toString() {
+    return "LoraLoadException: $message\nPath: '$path'";
+  }
+}
+
+// ============================================================
+// Tokenization Exceptions
+// ============================================================
+
+/// Thrown when tokenization fails.
+class TokenizationException implements Exception {
+  TokenizationException({required this.message, this.prompt, this.details});
+
+  /// Error message.
+  final String message;
+
+  /// The prompt that failed to tokenize (may be truncated).
+  final String? prompt;
+
+  /// Additional error details, if available.
+  final String? details;
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('TokenizationException: $message');
+    if (prompt != null) {
+      final truncated = prompt!.length > 100
+          ? '${prompt!.substring(0, 100)}...'
+          : prompt!;
+      buffer.write('\nPrompt: $truncated');
+    }
+    if (details != null) {
+      buffer.write('\nDetails: $details');
+    }
+    return buffer.toString();
+  }
+}

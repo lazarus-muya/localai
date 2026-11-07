@@ -8,10 +8,16 @@ import 'rich_content_view.dart';
 import 'streaming_indicator.dart';
 
 class MessageBubble extends ConsumerWidget {
-  const MessageBubble({super.key, required this.message, this.isModelWarm});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    this.isModelWarm,
+    this.isLoadingModel = false,
+  });
 
   final ChatMessage message;
   final bool? isModelWarm;
+  final bool isLoadingModel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,7 +45,11 @@ class MessageBubble extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isEmptyStreaming)
-                  StreamingIndicator(since: message.createdAt, isModelWarm: isModelWarm)
+                  StreamingIndicator(
+                    since: message.createdAt,
+                    isModelWarm: isModelWarm,
+                    isLoadingModel: isLoadingModel,
+                  )
                 else
                   RichContentView(content: message.content, textColor: textColor),
                 if (message.status == MessageStatus.error && message.errorMessage != null)
